@@ -8,12 +8,13 @@
   <title>OUTBREAK — City Network Simulator</title>
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./city-reference.css">
+  <link rel="stylesheet" href="./theme.css">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><strong>OUTBREAK</strong><small>CITY NETWORK SIMULATOR <span class="alpha">MAPA · V0.1</span></small></div></div>
-      <div class="top-actions"><span class="status-dot" aria-hidden="true"></span><span class="status-label">Cidade fictícia · mapa exploratório</span><button class="ghost" id="reset-view" type="button">Centralizar mapa</button></div>
+      <div class="top-actions"><span class="status-dot" aria-hidden="true"></span><span class="status-label">Cidade fictícia · mapa exploratório</span><button class="ghost" id="reset-view" type="button">Centralizar mapa</button><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Ativar modo escuro" aria-pressed="false" title="Ativar modo escuro"><span class="theme-toggle__icon" aria-hidden="true">☾</span><span class="theme-toggle__label">Modo escuro</span></button></div>
     </header>
 
     <main class="workspace">
@@ -45,5 +46,6 @@
     <footer class="footer"><span>OUTBREAK / EXPERIMENTAL</span><span>Dados da cidade e contatos sintéticos · Nenhuma previsão epidemiológica real</span></footer>
   </div>
   <script type="module" src="./src/map.js"></script>
+  <script type="module" src="./src/theme.js"></script>
 </body>
 </html>
