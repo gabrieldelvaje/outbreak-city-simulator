@@ -5,4 +5,49 @@
 .place-label{font-size:8px;stroke-width:2.3px;fill:#40535b}
 .bridge-label{font-size:8px;stroke-width:2.3px}
 .river-label{font-size:11px;stroke-width:1px}
+
+/* Larger graph nodes; SVG r is animatable and keeps each circle centered on its building. */
+#homes-layer .home-node > circle:first-of-type{
+  r:3.1px;
+  opacity:.96;
+  stroke:#fff;
+  stroke-width:1px;
+  transition:r 340ms cubic-bezier(.22,.7,.22,1),stroke-width 340ms ease,opacity 340ms ease;
+}
+#homes-layer .home-node:hover > circle:first-of-type,
+#homes-layer .home-node:focus-visible > circle:first-of-type{
+  r:5.6px;
+  stroke:#fff;
+  stroke-width:1.6px;
+  opacity:1;
+}
+/* Keep the invisible hit area larger than the animated dot, without drawing a ring. */
+#homes-layer .home-node > circle:last-of-type{
+  r:6.2px;
+  stroke:none;
+  stroke-width:0;
+}
+#homes-layer .home-node:hover > circle:last-of-type,
+#homes-layer .home-node:focus-visible > circle:last-of-type{
+  stroke:none;
+  stroke-width:0;
+}
+
+#places-layer .map-place > .place-bubble{
+  r:7px;
+  stroke:#fff;
+  stroke-width:1.5px;
+  transition:r 340ms cubic-bezier(.22,.7,.22,1),stroke-width 340ms ease;
+}
+#places-layer .map-place:hover > .place-bubble,
+#places-layer .map-place:focus-visible > .place-bubble{
+  r:10.5px;
+  stroke:#fff;
+  stroke-width:2px;
+}
+
 @media (max-width:780px){.district-label{font-size:9px}.place-label{font-size:8px}}
+@media (prefers-reduced-motion:reduce){
+  #homes-layer .home-node > circle:first-of-type,
+  #places-layer .map-place > .place-bubble{transition:none}
+}
