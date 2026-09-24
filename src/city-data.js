@@ -1,38 +1,39 @@
-// Fictional local map coordinates (1600 x 900). The city is not a real-world GIS map.
-export const WIDTH=1600,HEIGHT=900;
+// SVG city aligned to the reference image provided by the user.
+export const WIDTH=1600, HEIGHT=900;
+const X0=346,Y0=10,S=1.245;
+const P=(x,y)=>({x:X0+S*x,y:Y0+S*y});
+// Legacy function only for compatibility with the previous renderer.
 export const riverY=x=>345+66*Math.sin(x/185)+.11*x;
-// Crossings share the same x coordinates as north/south road corridors (50+100n).
 export const bridges=[
-{id:'ponte-norte',name:'Ponte Norte',x:350,y:riverY(350),open:true},
-{id:'ponte-central',name:'Ponte Central',x:850,y:riverY(850),open:true},
-{id:'ponte-sul',name:'Ponte Sul',x:1250,y:riverY(1250),open:true}
+{id:'ponte-norte',name:'Ponte Norte',...P(304,239),open:true},
+{id:'ponte-central',name:'Ponte Central',...P(522,356),open:true},
+{id:'ponte-sul',name:'Ponte Sul',...P(231,504),open:true}
 ];
 export const districts=[
-{id:'norte-verde',name:'Norte Verde',x:490,y:125,side:'norte',type:'Residencial · educação'},
-{id:'jardim-do-rio',name:'Jardim do Rio',x:1060,y:130,side:'norte',type:'Residencial · comércio'},
-{id:'vale-do-sol',name:'Vale do Sol',x:1450,y:130,side:'norte',type:'Residencial'},
-{id:'centro-civico',name:'Centro Cívico',x:525,y:550,side:'sul',type:'Serviços públicos'},
-{id:'vila-industrial',name:'Vila Industrial',x:205,y:865,side:'sul',type:'Indústria · logística'},
-{id:'parque-leste',name:'Parque Leste',x:1010,y:585,side:'sul',type:'Comércio · trabalho'},
-{id:'colinas-do-sul',name:'Colinas do Sul',x:1370,y:665,side:'sul',type:'Residencial · lazer'}
+{id:'norte-verde',name:'Norte Verde',...P(148,114),side:'norte',type:'Residencial'},
+{id:'jardim-do-rio',name:'Jardim do Rio',...P(370,104),side:'norte',type:'Residencial · educação'},
+{id:'vale-do-sol',name:'Vale do Sol',...P(603,95),side:'norte',type:'Residencial'},
+{id:'centro-civico',name:'Centro Cívico',...P(304,432),side:'sul',type:'Serviços públicos'},
+{id:'vila-industrial',name:'Vila Industrial',...P(479,682),side:'sul',type:'Indústria · logística'},
+{id:'parque-leste',name:'Parque Leste',...P(618,459),side:'sul',type:'Comércio · trabalho'},
+{id:'colinas-do-sul',name:'Colinas do Sul',...P(142,633),side:'sul',type:'Residencial · lazer'}
 ];
-// Parks occupy real parcels, not arbitrary circles behind streets.
-export const parks=[{x:100,y:185},{x:700,y:185},{x:1500,y:185},{x:100,y:635},{x:700,y:725},{x:1500,y:815}];
-// Public buildings occupy reserved city blocks; coordinates are shared by the hub and its footprint.
+export const parks=[P(124,326),P(338,350),P(528,197),P(435,592)];
+const place=(id,type,name,u,v,region,capacity,description)=>({id,type,name,...P(u,v),region,capacity,description});
 export const places=[
-{id:'escola-norte',type:'school',name:'Escola Norte Verde',x:500,y:275,region:'norte-verde',capacity:330,description:'Escola no quarteirão residencial. Os estudantes conectam domicílios e turmas.'},
-{id:'mercado-norte',type:'market',name:'Mercado do Norte',x:200,y:275,region:'norte-verde',capacity:80,description:'Mercado no quarteirão comercial do Norte Verde.'},
-{id:'escola-rio',type:'school',name:'Escola Jardim do Rio',x:1100,y:275,region:'jardim-do-rio',capacity:270,description:'Escola com prédio e pátio próprios no Jardim do Rio.'},
-{id:'mercado-rio',type:'market',name:'Mercado do Rio',x:1300,y:365,region:'jardim-do-rio',capacity:100,description:'Mercado junto à avenida de acesso à Ponte Sul.'},
-{id:'hospital-central',type:'hospital',name:'Hospital Municipal',x:500,y:725,region:'centro-civico',capacity:120,description:'Hospital municipal com quarteirão dedicado e acesso viário.'},
-{id:'prefeitura',type:'civic',name:'Prefeitura',x:600,y:635,region:'centro-civico',capacity:160,description:'Edifício cívico com praça de acesso e quarteirão próprio.'},
-{id:'praca-civica',type:'park',name:'Praça Cívica',x:300,y:635,region:'centro-civico',capacity:120,description:'Praça arborizada que ocupa uma quadra inteira.'},
-{id:'fabrica-oeste',type:'office',name:'Distrito Empresarial Oeste',x:200,y:725,region:'vila-industrial',capacity:560,description:'Edifícios de trabalho e pátio de logística no bairro industrial.'},
-{id:'escola-industrial',type:'school',name:'Escola Vila Industrial',x:100,y:815,region:'vila-industrial',capacity:220,description:'Escola com acesso a uma rua local, pátio e edifício próprio.'},
-{id:'centro-empresarial',type:'office',name:'Centro Empresarial Leste',x:1100,y:725,region:'parque-leste',capacity:620,description:'Complexo de escritórios em um quarteirão do Parque Leste.'},
-{id:'praca-torres',type:'park',name:'Praça das Torres',x:900,y:725,region:'parque-leste',capacity:150,description:'Praça pública arborizada entre os edifícios do Parque Leste.'},
-{id:'escola-colinas',type:'school',name:'Escola Colinas do Sul',x:1400,y:815,region:'colinas-do-sul',capacity:280,description:'Escola de bairro com pátio e acesso pelas ruas locais.'},
-{id:'parque-colinas',type:'park',name:'Parque das Colinas',x:1500,y:725,region:'colinas-do-sul',capacity:280,description:'Parque com áreas verdes e caminhos de pedestres.'}
+place('escola-norte','school','Escola Norte Verde',204,176,'norte-verde',330,'Escola em edifício próprio no bairro residencial.'),
+place('mercado-norte','market','Mercado do Norte',155,223,'norte-verde',80,'Mercado de bairro com área comercial dedicada.'),
+place('escola-rio','school','Escola Jardim do Rio',553,253,'jardim-do-rio',270,'Escola com pátio, próxima ao setor residencial da margem norte.'),
+place('mercado-rio','market','Mercado do Rio',623,302,'vale-do-sol',100,'Mercado com acesso a uma avenida da margem norte.'),
+place('hospital-central','hospital','Hospital Municipal',559,549,'parque-leste',120,'Hospital municipal e principal referência de atendimento da cidade.'),
+place('prefeitura','civic','Prefeitura',439,501,'centro-civico',160,'Edifício administrativo reservado em lote próprio.'),
+place('praca-civica','park','Praça Cívica',337,349,'centro-civico',120,'Praça central já presente no mapa de referência.'),
+place('fabrica-oeste','office','Distrito Empresarial Oeste',467,578,'vila-industrial',560,'Área empresarial em quadra maior no setor sul.'),
+place('escola-industrial','school','Escola Vila Industrial',322,603,'vila-industrial',220,'Escola com edifício e pátio próprios.'),
+place('centro-empresarial','office','Centro Empresarial Leste',618,538,'parque-leste',620,'Complexo comercial e de trabalho em quadra dedicada.'),
+place('praca-torres','park','Parque do Oeste',121,320,'norte-verde',150,'Parque existente no desenho original, sem novas praças sobrepostas.'),
+place('escola-colinas','school','Escola Colinas',631,181,'vale-do-sol',280,'Escola do setor leste em lote residencial.'),
+place('parque-colinas','park','Parque do Mirante',527,198,'vale-do-sol',280,'Área verde original ao norte do rio.')
 ];
-export const placeColors={school:'#397fc6',market:'#db8940',hospital:'#cf5360',civic:'#627b98',park:'#39895b',office:'#7360a8'};
+export const placeColors={school:'#347fc5',market:'#df9044',hospital:'#cf5360',civic:'#607a98',park:'#39895b',office:'#7360a8'};
 export const placeGlyphs={school:'E',market:'M',hospital:'+',civic:'C',park:'P',office:'T'};
