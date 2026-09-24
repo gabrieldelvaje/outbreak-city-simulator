@@ -6,14 +6,13 @@ import {normalizeReferenceStreets} from './normalize-streets.js';
 const UNSITED_HOME_IDS=[20,21,29,30,31,32,63,75,109,151,152,155,157,159];
 const SVG_NS='http://www.w3.org/2000/svg';
 
-// Each centerline follows the actual street axis of the supplied vector map.
-// The north road runs from (264,260) to (389,186); the central avenue runs
-// through (448,378), (535,354) and (593,338). The south bridge follows the
-// narrow north/south white road. Keep the closure within each crossing.
+// Center each closure on the visible road axis. North and central follow the
+// yellow avenue; south follows the white bridge with a slightly corrected angle.
+// The invisible click target and red interdiction stripe use the same path.
 const BRIDGE_CENTERLINES={
-  'ponte-norte':'M295 241.6L338 216.2',
-  'ponte-central':'M501 363.4L563 346.2',
-  'ponte-sul':'M352 489L359 532'
+  'ponte-norte':'M297 239.2L341 213.8',
+  'ponte-central':'M500 364L566 345.6',
+  'ponte-sul':'M354 487.5L356.5 535.5'
 };
 
 function removeUnsitedHomes(root){
