@@ -2,9 +2,10 @@
 // Coordinates are in the original map coordinate system, never in screen pixels.
 const NS='http://www.w3.org/2000/svg';
 const C={ground:'#e5e5e5',road:'#f4ba3e',minor:'#f8f8f8',water:'#74cbec',bank:'#fff87b',field:'#dceacb'};
+const LOCAL_STREET_WIDTH=2.8; // One consistent width for every white peripheral street.
 const node=(name,attrs,parent)=>{const el=document.createElementNS(NS,name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));parent.append(el);return el;};
 const shape=(parent,d,fill)=>node('path',{d,fill},parent);
-const street=(parent,d,width=2)=>node('path',{d,fill:'none',stroke:C.minor,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round'},parent);
+const street=(parent,d)=>node('path',{d,fill:'none',stroke:C.minor,'stroke-width':LOCAL_STREET_WIDTH,'stroke-linecap':'round','stroke-linejoin':'round'},parent);
 const avenue=(parent,d,width=5.8)=>node('path',{d,fill:'none',stroke:C.road,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round'},parent);
 
 export function extendReferenceMap(world){
@@ -35,6 +36,7 @@ export function extendReferenceMap(world){
   ['M740 405Q1000 482 1300 535',5.7],
   ['M664 739Q677 817 694 940',5.7]
  ])avenue(underlay,d,w);
+ // Every white continuation uses LOCAL_STREET_WIDTH. The yellow arterials retain their hierarchy.
  for(const d of [
   'M-500 -100L-335 -68 -162 -31 0 8',
   'M-500 -35L-285 8 -132 41 0 95',
