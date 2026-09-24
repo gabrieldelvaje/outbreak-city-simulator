@@ -7,18 +7,23 @@ const world=$('map-world');
 drawCity(world);
 finishLandscape(world);
 const bridgeState=Object.fromEntries(bridges.map(b=>[b.id,true]));
-// At the maximum zoom-out the top and bottom of the reference city touch the
-// viewport's north/south limits. The wider old bounds left unused gray strips.
-// Keep the 16:9 SVG aspect ratio and allow panning only after zooming IN.
+// Keep the desktop view unchanged. On mobile, use a closer maximum zoom-out
+// in both themes so the city fills more of the available map area.
 const bounds={left:-30,top:-2,right:1630,bottom:932};
-const maxWidth=1660;
-const fullView=()=>({x:-30,y:-2,w:maxWidth,h:maxWidth*HEIGHT/WIDTH});
+const DESKTOP_MAX_WIDTH=1660;
+const MOBILE_MAX_WIDTH=1280;
+const mobileLayout=window.matchMedia('(max-width: 780px)');
+const maxWidth=()=>mobileLayout.matches?MOBILE_MAX_WIDTH:DESKTOP_MAX_WIDTH;
+const fullView=()=>{
+ const w=maxWidth(),h=w*HEIGHT/WIDTH;
+ return {x:bounds.left+(DESKTOP_MAX_WIDTH-w)/2,y:bounds.top+(bounds.bottom-bounds.top-h)/2,w,h};
+};
 let view=fullView(),drag=null;
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 function updateView(){svg.setAttribute('viewBox',`${view.x} ${view.y} ${view.w} ${view.h}`);}
 function constrain(){view.x=clamp(view.x,bounds.left,bounds.right-view.w);view.y=clamp(view.y,bounds.top,bounds.bottom-view.h);}
 function zoom(factor,centerX=view.x+view.w/2,centerY=view.y+view.h/2){
- const w=clamp(view.w*factor,240,maxWidth),h=w*HEIGHT/WIDTH;
+ const w=clamp(view.w*factor,240,maxWidth()),h=w*HEIGHT/WIDTH;
  const fx=(centerX-view.x)/view.w,fy=(centerY-view.y)/view.h;
  view={x:centerX-fx*w,y:centerY-fy*h,w,h};constrain();updateView();
 }
@@ -26,6 +31,9 @@ const reset=()=>{view=fullView();updateView();};
 $('reset-view').onclick=reset;$('zoom-reset').onclick=reset;
 $('zoom-in').onclick=()=>zoom(.78);$('zoom-out').onclick=()=>zoom(1.28);
 updateView();
+// Reframe only when crossing the mobile/desktop breakpoint, not on every
+// browser-chrome resize or device rotation that stays in the same layout.
+mobileLayout.addEventListener('change',reset);
 // The rendered SVG may letterbox on narrow screens. Convert gestures using
 // the displayed SVG region rather than the surrounding map container.
 function screenRect(){
