@@ -1,207 +1,109 @@
 import {WIDTH, HEIGHT, riverY} from './city-data.js';
 
-const NS = 'http://www.w3.org/2000/svg';
-const el = (tag, attrs = {}, parent) => {
-  const node = document.createElementNS(NS, tag);
-  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
-  parent?.append(node);
-  return node;
-};
-const path = (d, fill, parent, attrs = {}) => el('path', {d, fill, ...attrs}, parent);
-const line = (d, color, width, parent, attrs = {}) => path(d, 'none', parent, {
-  stroke: color, 'stroke-width': width, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', ...attrs
-});
-const road = (d, width, parent, major = false) => {
-  line(d, major ? '#bfc0b5' : '#d9dfdc', width + 3, parent);
-  line(d, major ? '#f0d586' : '#ffffff', width, parent);
-};
-const random = seed => () => {seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296;};
-const polygon = points => 'M' + points.map(([x,y]) => `${x},${y}`).join('L') + 'Z';
-const inside = (x, y, polygonPoints) => {
-  let hit = false;
-  for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
-    const a = polygonPoints[i], b = polygonPoints[j];
-    if ((a[1] > y) !== (b[1] > y) && x < (b[0]-a[0]) * (y-a[1]) / (b[1]-a[1]) + a[0]) hit = !hit;
-  }
-  return hit;
-};
-const riverLine = (offset, from = -280, to = 1880) => {
-  const coords = [];
-  for (let x = from; x <= to; x += 8) coords.push(`${x},${(riverY(x) + offset).toFixed(1)}`);
-  return 'M' + coords.join('L');
-};
-const riverBand = (a, b) => {
-  const first = [], second = [];
-  for (let x = -280; x <= 1880; x += 8) {
-    first.push([x, riverY(x)+a]); second.push([x, riverY(x)+b]);
-  }
-  return polygon([...first, ...second.reverse()]);
-};
+// Scenic suburbs only: all interactive buildings and road nodes stay in city-map.js.
+const NS='http://www.w3.org/2000/svg';
+const svg=(name,attrs={},parent)=>{const node=document.createElementNS(NS,name);for(const [k,v] of Object.entries(attrs))node.setAttribute(k,String(v));parent?.append(node);return node;};
+const shape=(d,fill,parent,attrs={})=>svg('path',{d,fill,...attrs},parent);
+const stroke=(d,color,width,parent,attrs={})=>shape(d,'none',parent,{stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',...attrs});
+const street=(d,width,parent,major=false)=>{stroke(d,major?'#c9bb94':'#dbe0dd',width+2,parent);stroke(d,major?'#f2d893':'#fff',width,parent);};
+const rng=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+const polygon=p=>'M'+p.map(([x,y])=>`${x},${y}`).join('L')+'Z';
+const contains=(p,x,y)=>{let inside=false;for(let i=0,j=p.length-1;i<p.length;j=i++)if((p[i][1]>y)!==(p[j][1]>y)&&x<(p[j][0]-p[i][0])*(y-p[i][1])/(p[j][1]-p[i][1])+p[i][0])inside=!inside;return inside;};
+const riverCoords=offset=>{const p=[];for(let x=-300;x<=1900;x+=10)p.push([x,riverY(x)+offset]);return p;};
+const riverBand=(a,b)=>polygon([...riverCoords(a),...riverCoords(b).reverse()]);
+const isDry=(x,y)=>Math.abs(y-riverY(x))>96;
+const insideCore=(x,y)=>x>=0&&x<=WIDTH&&y>=0&&y<=HEIGHT;
 
-// The existing 1600 x 900 interactive map is kept intact in this central rectangle.
-// Only the NON-interactive surroundings are drawn by this module.
-const core = [[40,62],[1560,62],[1560,858],[40,858]];
-
-// Separate neighborhoods, NOT a single scalloped/cloud outline. Each polygon follows
-// street ends and contains small straight-sided urban lots; green farm gaps remain between them.
-const neighborhoods = [
-  [[40,80],[40,62],[90,62],[90,-18],[134,-18],[134,-58],[239,-58],[239,-100],[320,-100],[320,-67],[395,-67],[395,-12],[468,-12],[468,62],[538,62],[538,107],[398,119],[290,101],[190,125],[90,118]],
-  [[550,62],[550,-12],[610,-12],[610,-72],[676,-72],[676,-150],[802,-150],[802,-112],[872,-112],[872,-163],[961,-163],[961,-98],[1016,-98],[1016,-28],[1092,-28],[1092,62]],
-  [[1120,62],[1120,-17],[1191,-17],[1191,-67],[1259,-67],[1259,-46],[1344,-46],[1344,-89],[1469,-89],[1469,-42],[1560,-42],[1560,16],[1640,16],[1640,62]],
-  [[40,172],[40,419],[-11,419],[-11,382],[-75,382],[-75,336],[-127,336],[-127,264],[-211,264],[-211,189],[-142,189],[-142,140],[-67,140],[-67,172]],
-  [[40,487],[40,831],[-15,831],[-15,787],[-90,787],[-90,725],[-164,725],[-164,674],[-207,674],[-207,546],[-137,546],[-137,490],[-52,490],[-52,450],[12,450],[12,487]],
-  [[1560,132],[1640,132],[1640,168],[1733,168],[1733,237],[1814,237],[1814,355],[1751,355],[1751,431],[1684,431],[1684,467],[1560,467]],
-  [[1560,512],[1635,512],[1635,561],[1690,561],[1690,600],[1812,600],[1812,693],[1737,693],[1737,781],[1657,781],[1657,827],[1560,827]],
-  [[110,858],[405,858],[405,911],[470,911],[470,950],[429,950],[429,1009],[340,1009],[340,1072],[218,1072],[218,1032],[144,1032],[144,984],[64,984],[64,923],[110,923]],
-  [[596,858],[984,858],[984,924],[945,924],[945,998],[880,998],[880,1070],[760,1070],[760,1031],[687,1031],[687,967],[615,967]],
-  [[1107,858],[1560,858],[1560,902],[1669,902],[1669,977],[1583,977],[1583,1044],[1478,1044],[1478,1090],[1343,1090],[1343,1028],[1268,1028],[1268,975],[1177,975],[1177,922],[1107,922]]
+// District-level street orientations rather than one citywide grid or a cloud perimeter.
+const quarters=[
+ {name:'Jardim das Palmeiras',c:[240,-80],a:-11,dx:81,dy:69,p:[[-65,65],[-44,-1],[24,-34],[63,-122],[163,-178],[293,-159],[390,-122],[474,-145],[562,-66],[560,78],[412,94],[296,101],[148,90],[30,127]]},
+ {name:'Alto do Mirante',c:[800,-104],a:7,dx:77,dy:66,p:[[500,72],[505,-58],[581,-113],[642,-197],[793,-199],[874,-155],[1014,-181],[1095,-96],[1151,25],[1133,103],[959,77],[789,100],[636,85]]},
+ {name:'Bosque Norte',c:[1410,-76],a:-15,dx:83,dy:69,p:[[1118,87],[1130,-21],[1187,-79],[1303,-103],[1391,-178],[1525,-155],[1646,-87],[1720,6],[1708,157],[1568,152],[1480,95],[1310,107]]},
+ {name:'Vila do Oeste',c:[-120,166],a:15,dx:72,dy:61,p:[[40,61],[-37,51],[-106,93],[-170,77],[-238,148],[-256,254],[-179,329],[-102,351],[32,311],[89,248]]},
+ {name:'Jardim do Lago',c:[-142,695],a:-10,dx:76,dy:64,p:[[21,466],[-88,484],[-176,514],[-247,608],[-233,748],[-188,847],[-68,905],[60,905],[122,829],[81,710]]},
+ {name:'Vale das Flores',c:[1715,230],a:13,dx:74,dy:67,p:[[1521,69],[1633,81],[1747,137],[1851,148],[1880,263],[1836,354],[1740,402],[1619,364],[1548,301]]},
+ {name:'Parque das Águas',c:[1703,764],a:-13,dx:78,dy:63,p:[[1550,590],[1687,615],[1770,683],[1880,676],[1880,836],[1801,916],[1695,918],[1620,878],[1525,800]]},
+ {name:'Santa Clara',c:[274,1010],a:13,dx:75,dy:64,p:[[32,826],[157,836],[252,870],[352,862],[452,923],[473,1042],[387,1092],[240,1095],[138,1043],[31,1009],[-38,907]]},
+ {name:'Jardim Primavera',c:[832,1027],a:-8,dx:79,dy:67,p:[[558,831],[680,844],[811,869],[966,853],[1086,908],[1072,998],[1005,1100],[792,1100],[690,1068],[570,1027]]},
+ {name:'Colinas',c:[1433,1005],a:17,dx:83,dy:65,p:[[1119,844],[1261,842],[1374,861],[1489,836],[1594,902],[1730,943],[1722,1053],[1602,1100],[1379,1100],[1268,1029],[1141,986]]}
 ];
-const atCore = (x,y) => x>=40 && x<=1560 && y>=62 && y<=858;
-const atSuburb = (x,y) => !atCore(x,y) && neighborhoods.some(points => inside(x,y,points));
-const onDryLand = (x,y) => Math.abs(y-riverY(x)) > 94;
 
-export function finishLandscape(root) {
-  const oldChildren = [...root.childNodes];
-  root.replaceChildren();
-  const defs = el('defs', {}, root);
-  path(polygon(core), '#fff', el('clipPath', {id:'outbreak-core-clip'}, defs));
-  const urbanClip = el('clipPath', {id:'outbreak-urban-clip'}, defs);
-  path(polygon(core), '#fff', urbanClip);
-  for (const points of neighborhoods) path(polygon(points), '#fff', urbanClip);
-  const dryClip = el('clipPath', {id:'outbreak-fringe-dry'}, defs);
-  const north = [], south = [];
-  for (let x=-280; x<=1880; x+=8) {
-    north.push([x,riverY(x)-81]); south.push([x,riverY(x)+81]);
+function drawFields(parent){
+  svg('rect',{x:-310,y:-220,width:2220,height:1350,fill:'#dcebcf'},parent);
+  const random=rng(31542),colors=['#d6e7bb','#e8e9c7','#cde0b6','#dce5b6','#d3e3c9'];
+  // Large irregular farm parcels sit under the built-up area, not over its streets.
+  for(let j=0;j<5;j++)for(let i=0;i<8;i++){
+    const x=-360+i*305+j*12,y=-260+j*300+i*7,w=220+random()*80,h=170+random()*93;
+    shape(polygon([[x,y+14],[x+w-13,y-7],[x+w+8,y+h-22],[x+22,y+h+8]]),colors[(i+2*j)%colors.length],parent,{opacity:.63});
+    if(random()<.55)for(let k=1;k<=5;k++)stroke(`M${x+20+k*26} ${y+24}L${x+37+k*26} ${y+h-22}`,'#edf0d3',.85,parent,{opacity:.4});
   }
-  path(polygon([[-280,-200],[1880,-200],...north.reverse()]),'#fff',dryClip);
-  path(polygon([...south,[1880,1100],[-280,1100]]),'#fff',dryClip);
+  for(const d of ['M-280 13Q-221 -47 -147 -35L-90 9L-141 71L-277 112Z','M1769 38Q1844 7 1900 73L1900 182L1803 142Z','M-298 952L-210 900Q-124 929 -100 1060L-226 1124L-298 1084Z','M1778 990Q1863 965 1900 1024L1900 1120L1779 1110Z'])shape(d,'#b5d5a9',parent,{opacity:.65});
+}
 
-  const farm = el('g', {'aria-hidden':'true'}, root), rng = random(771944);
-  el('rect',{x:-280,y:-200,width:2160,height:1300,fill:'#d7e8c6'},farm);
-  // Modest, differently sized agricultural parcels, rendered BEHIND every urban area.
-  const cropColors=['#e1e8bb','#cce0b4','#e7e2bb','#d3e6ba','#bed8a9','#dce5b9'];
-  for (let row=0; row<15; row++) for (let column=0; column<18; column++) {
-    const x=-310+column*131+(row%2)*31, y=-210+row*95;
-    const w=93+rng()*40, h=58+rng()*36;
-    const corners=[[x+2,y+3],[x+w,y-4+rng()*12],[x+w+3,y+h],[x-4,y+h-3]];
-    path(polygon(corners),cropColors[Math.floor(rng()*cropColors.length)],farm,{opacity:'.77'});
-    if(rng()<.65)for(let k=1;k<5;k++)line(`M${x+12+k*14} ${y+11}L${x+9+k*14} ${y+h-10}`,'#f1efce',.8,farm,{opacity:'.55'});
-  }
-  // Distinct built-up patches, with agricultural openings between projecting suburbs.
-  const city = el('g', {'aria-hidden':'true'}, root);
-  path(polygon(core),'#eff2ee',city);
-  for (const points of neighborhoods) path(polygon(points),'#eff2ee',city);
-
-  // Rural through-roads continue beyond suburb limits, but no rectangular grid is
-  // extended into the fields. Their urban sections are drawn again with urban road styling.
-  const ruralRoads = el('g', {'aria-hidden':'true'}, root);
-  for(const x of [350,850,1250]) {
-    road(`M${x} -195L${x} 65`,5,ruralRoads);
-    road(`M${x} 856L${x} 1098`,5,ruralRoads);
-  }
-  for(const y of [230,590,770]) {
-    road(`M-278 ${y}L45 ${y}`,5,ruralRoads);
-    road(`M1555 ${y}L1878 ${y}`,5,ruralRoads);
-  }
-
-  const fringe = el('g', {'clip-path':'url(#outbreak-urban-clip)','aria-hidden':'true'}, root);
-  const streets = el('g', {'clip-path':'url(#outbreak-fringe-dry)'}, fringe);
-  const paths = [];
-  const addRoad = (d,width=5,major=false) => {
-    road(d,width,streets,major);
-    const probe=el('path',{d,fill:'none',stroke:'none'},streets);
-    const length=probe.getTotalLength(),samples=[];
-    for(let t=0;t<=length;t+=8){const p=probe.getPointAtLength(t);samples.push([p.x,p.y]);}
-    probe.remove();paths.push(samples);
-  };
-  // The ten main approaches join REAL existing streets at the edge of the interactive core.
-  for (const d of [
-    'M-275 230C-166 231 -85 220 50 230','M-275 590C-158 575 -70 596 50 590',
-    'M-275 770C-154 758 -63 786 50 770',
-    'M1550 230C1644 217 1741 251 1880 230','M1550 590C1660 576 1764 619 1880 590',
-    'M1550 770C1661 748 1776 790 1880 770',
-    'M350 65C344 -7 321 -83 350 -200','M850 65C858 -21 823 -98 850 -200',
-    'M1250 65C1260 -23 1218 -83 1250 -200',
-    'M350 855C343 927 377 1016 350 1100','M850 855C863 919 830 1014 850 1100',
-    'M1250 855C1262 917 1230 1000 1250 1100'
-  ]) addRoad(d,9,true);
-  // Small neighborhood streets are locally connected and vary in angle and curvature.
-  // They are decorative outside the central graph, unlike the retained city streets.
-  for(const d of [
-    'M40 140L-88 140Q-126 140 -144 190L-145 230',
-    'M40 320L-81 320Q-126 309 -144 265L-144 230',
-    'M40 500Q-90 498 -130 556L-134 590',
-    'M40 680L-102 680Q-142 665 -164 630L-164 590',
-    'M40 810L-60 810Q-109 805 -132 772L-132 770',
-    'M150 62L149 -22Q149 -51 194 -52L350 -52',
-    'M250 62L249 -20L350 -20',
-    'M450 62L452 -16Q482 -47 544 -47L850 -47',
-    'M650 62L650 -89L850 -89',
-    'M950 62L952 -62L850 -62',
-    'M1050 62L1050 -10L1250 -10',
-    'M1150 62L1150 -47L1250 -47',
-    'M1350 62Q1357 -50 1450 -51L1450 2L1550 2',
-    'M1450 62L1450 -25L1550 -25',
-    'M1560 140L1685 140Q1738 163 1738 230',
-    'M1560 320Q1700 309 1744 355L1744 390',
-    'M1560 500L1690 500Q1742 512 1750 590',
-    'M1560 680Q1689 685 1740 729L1740 770',
-    'M1560 810L1660 810Q1706 814 1740 770',
-    'M150 858L151 949Q180 976 238 976L350 976',
-    'M250 858L250 925L350 925',
-    'M450 858Q480 903 480 934L350 934',
-    'M650 858L650 929Q695 961 759 961L850 961',
-    'M750 858L750 923L850 923',
-    'M950 858L950 998L850 998',
-    'M1050 858L1050 916L1250 916',
-    'M1150 858L1150 952L1250 952',
-    'M1350 858L1350 994L1250 994',
-    'M1450 858Q1450 916 1510 932L1590 932L1590 970L1350 970'
-  ])addRoad(d);
-
-  // Houses align along suburban streets, instead of a regular rectangular background.
-  // A full 12x12 footprint must remain inside a neighborhood and away from any road.
-  const homes=el('g',{},fringe);
-  const distanceToRoute=(x,y,points)=>{
-    let closest=Infinity;
-    for(let i=1;i<points.length;i++){
-      const [ax,ay]=points[i-1],[bx,by]=points[i],dx=bx-ax,dy=by-ay;
-      const t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy||1)));
-      closest=Math.min(closest,Math.hypot(x-(ax+t*dx),y-(ay+t*dy)));
-    }
-    return closest;
-  };
-  for(const points of paths)for(let i=2;i<points.length-2;i+=3){
-    const [x,y]=points[i],a=points[i-2],b=points[i+2];
-    const dx=b[0]-a[0],dy=b[1]-a[1],size=Math.hypot(dx,dy)||1;
-    for(const side of [-1,1]){
-      if(rng()<.17)continue;
-      const cx=x+side*(-dy/size)*(17+rng()*4),cy=y+side*(dx/size)*(17+rng()*4);
-      if(!onDryLand(cx,cy)||!atSuburb(cx,cy))continue;
-      const whollyInside=neighborhoods.some(area=>[[cx-7,cy-7],[cx+7,cy-7],[cx+7,cy+7],[cx-7,cy+7]].every(([px,py])=>inside(px,py,area)));
-      if(!whollyInside||paths.some(route=>distanceToRoute(cx,cy,route)<13))continue;
-      el('rect',{x:cx-5.2,y:cy-4.2,width:10.4,height:8.4,rx:1,
-        fill:rng()<.23?'#d1d8d5':'#c2cbc9',stroke:'#b7c3c0','stroke-width':.5},homes);
+function drawQuarter(q,index,underlay,roadsLayer,buildingLayer,defs){
+  const id=`outbreak-quarter-${index}`;
+  shape(polygon(q.p),'white',svg('clipPath',{id},defs));
+  shape(polygon(q.p),'#eff2ee',underlay);
+  const roadGroup=svg('g',{'clip-path':`url(#${id})`},roadsLayer);
+  const buildingGroup=svg('g',{'clip-path':`url(#${id})`},buildingLayer);
+  const transform=`translate(${q.c[0]} ${q.c[1]}) rotate(${q.a})`;
+  const rg=svg('g',{transform},roadGroup),hg=svg('g',{transform},buildingGroup);
+  // Rotated local street grids, with intersections sharing identical coordinates.
+  for(let x=-510;x<=510;x+=q.dx)street(`M${x} -360L${x} 360`,4.4,rg);
+  for(let y=-360;y<=360;y+=q.dy)street(`M-520 ${y}L520 ${y}`,4.4,rg);
+  const r=rng(5107+index*761),angle=q.a*Math.PI/180,ca=Math.cos(angle),sa=Math.sin(angle);
+  for(let gx=-510;gx<510;gx+=q.dx)for(let gy=-360;gy<360;gy+=q.dy){
+    for(const [ox,oy] of [[.22,.26],[.54,.26],[.22,.61],[.54,.61]]){
+      const lx=gx+q.dx*ox,ly=gy+q.dy*oy;
+      const x=q.c[0]+lx*ca-ly*sa,y=q.c[1]+lx*sa+ly*ca;
+      if(insideCore(x,y)||!isDry(x,y)||!contains(q.p,x,y)||r()<.21)continue;
+      if((Math.min(...[350,850,1250].map(t=>Math.abs(x-t)))<14&&(y<70||y>840))||
+        (Math.min(...[230,590,770].map(t=>Math.abs(y-t)))<14&&(x<24||x>1576)))continue;
+      svg('rect',{x:lx,y:ly,width:8+r()*5,height:7+r()*5,rx:1,fill:r()<.22?'#d4dad8':'#c9d0ce'},hg);
     }
   }
+}
 
-  // The same river continues past the city; roads and buildings never cross water.
-  path(riverBand(-80,80),'#a5d39e',root);
-  path(riverBand(-54,54),'#84cde9',root,{stroke:'#acd7db','stroke-width':1.2});
-  line(riverLine(-62),'#8cbe8e',1.5,root);
-  line(riverLine(62),'#8cbe8e',1.5,root);
+function drawRuralRoads(parent){
+  // Approaches meet the existing major axes, and are clipped at the riverbanks.
+  for(const x of [350,850,1250]){street(`M${x} -220L${x} 20`,7,parent,true);street(`M${x} 879L${x} 1130`,7,parent,true);}
+  for(const y of [230,590,770]){
+    street(`M-310 ${y}L22 ${y}`,7,parent,y===230);
+    if(y!==590)street(`M1578 ${y}L1910 ${y}`,7,parent,y===230);
+  }
+}
 
-  // Reuse ALL original SVG objects, unchanged: central streets, lots, nodes,
-  // schools, hospital, river, crossings, labels and their interactive selectors.
-  const center=el('g',{'clip-path':'url(#outbreak-core-clip)','data-layer':'urban-core'},root);
-  for(const child of oldChildren)center.append(child);
-  const centralStreets=center.querySelector('g[clip-path="url(#city-dry-land)"]');
-  if(centralStreets){
-    const avenue=el('g',{'clip-path':'url(#city-dry-land)','aria-hidden':'true'},null);
-    centralStreets.after(avenue); // BEFORE buildings and nodes: no street overlay on homes.
-    for(const bank of [-1,1]){
-      road(riverLine(bank*89,-15,1615),7,avenue);
-      line(riverLine(bank*79,-15,1615),'#79b881',1.4,avenue);
-    }
+export function finishLandscape(root){
+  const original=[...root.childNodes];root.replaceChildren();
+  const defs=svg('defs',{},root);
+  const coreClip=svg('clipPath',{id:'outbreak-core-visible'},defs);
+  svg('rect',{x:0,y:0,width:WIDTH,height:HEIGHT},coreClip);
+  const dry=svg('clipPath',{id:'outbreak-dry-fringe'},defs);
+  shape(polygon([[-310,-220],[1910,-220],...riverCoords(-84).reverse()]),'white',dry);
+  shape(polygon([...riverCoords(84),[1910,1130],[-310,1130]]),'white',dry);
+
+  const land=svg('g',{'aria-hidden':'true'},root);drawFields(land);
+  // The core and every surrounding quarter use the same land tint: no rectangular seam.
+  svg('rect',{x:0,y:0,width:WIDTH,height:HEIGHT,fill:'#eff2ee'},root);
+  const quarterLand=svg('g',{'aria-hidden':'true'},root);
+  const ruralRoads=svg('g',{'clip-path':'url(#outbreak-dry-fringe)','aria-hidden':'true'},root);drawRuralRoads(ruralRoads);
+  const quarterRoads=svg('g',{'clip-path':'url(#outbreak-dry-fringe)','aria-hidden':'true'},root);
+  const quarterBuildings=svg('g',{'clip-path':'url(#outbreak-dry-fringe)','aria-hidden':'true'},root);
+  quarters.forEach((q,i)=>drawQuarter(q,i,quarterLand,quarterRoads,quarterBuildings,defs));
+
+  shape(riverBand(-82,82),'#a8d39f',root);
+  shape(riverBand(-54,54),'#84cde9',root,{stroke:'#a8d4d7','stroke-width':1.1});
+
+  // Keep all original interactive map layers except its rectangular opaque base.
+  // The full original view rect, rather than the old inset clip, preserves district labels.
+  const center=svg('g',{'clip-path':'url(#outbreak-core-visible)','data-layer':'urban-core'},root);
+  for(const child of original){
+    if(child.tagName?.toLowerCase()==='rect'&&child.getAttribute('width')===String(WIDTH)&&child.getAttribute('height')===String(HEIGHT))continue;
+    center.append(child);
+  }
+  const names=svg('g',{'aria-hidden':'true'},root);
+  for(const q of quarters){
+    const [x,y]=q.c;if(insideCore(x,y)||Math.abs(y-riverY(x))<150)continue;
+    const t=svg('text',{x,y,'text-anchor':'middle',class:'outskirts-label'},names);t.textContent=q.name;
   }
 }
