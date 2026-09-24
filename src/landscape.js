@@ -1,100 +1,121 @@
-import {WIDTH,HEIGHT,riverY,bridges} from './city-data.js';
+import {WIDTH,HEIGHT,riverY} from './city-data.js';
 
 const NS='http://www.w3.org/2000/svg';
-const el=(tag,attrs={},parent)=>{const node=document.createElementNS(NS,tag);for(const [name,value] of Object.entries(attrs))node.setAttribute(name,String(value));parent?.append(node);return node;};
-const trace=(d,color,width,parent,extra={})=>el('path',{d,fill:'none',stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',...extra},parent);
-const road=(d,width,parent,major=false)=>{trace(d,major?'#d1b873':'#e0e6e2',width+3,parent);trace(d,major?'#efd383':'#fff',width,parent);};
-const rand=(seed)=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-const riverLine=(offset,from,to)=>{const parts=[];for(let x=from;x<=to;x+=5)parts.push([x,riverY(x)+offset]);parts.push([to,riverY(to)+offset]);return parts;};
-const shape=points=>'M'+points.map(([x,y])=>`${x.toFixed(1)},${y.toFixed(1)}`).join('L')+'Z';
-const riverBand=(upper,lower,from,to)=>shape([...riverLine(upper,from,to),...riverLine(lower,from,to).reverse()]);
-const riverRoad=(offset,from,to)=>'M'+riverLine(offset,from,to).map(([x,y])=>`${x.toFixed(1)},${y.toFixed(1)}`).join('L');
+const el=(tag,attrs={},parent)=>{
+  const node=document.createElementNS(NS,tag);
+  for(const [k,v] of Object.entries(attrs))node.setAttribute(k,String(v));
+  parent?.append(node);return node;
+};
+const path=(d,fill,parent,extra={})=>el('path',{d,fill,...extra},parent);
+const line=(d,color,width,parent,extra={})=>path(d,'none',parent,{stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',...extra});
+const road=(d,width,parent,major=false)=>{
+  line(d,major?'#cdb574':'#e0e5e1',width+3,parent);
+  line(d,major?'#f0d58b':'#fff',width,parent);
+};
+const random=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+const riverline=(offset,from=-270,to=1870)=>{
+  const pts=[];for(let x=from;x<=to;x+=8)pts.push(`${x},${(riverY(x)+offset).toFixed(1)}`);
+  return 'M'+pts.join('L');
+};
+const ribbon=(a,b)=>{
+  const first=[],last=[];
+  for(let x=-270;x<=1870;x+=8){first.push(`${x},${(riverY(x)+a).toFixed(1)}`);last.push(`${x},${(riverY(x)+b).toFixed(1)}`);}
+  return `M${first.join('L')}L${last.reverse().join('L')}Z`;
+};
 
-/** Extend the fictional town into countryside; never use photographic tiles or real GIS coordinates. */
+// Irregular perimeters are strictly visual. The original central grid retains
+// the same coordinate system, building footprints and interactive node IDs.
+const CORE='M25 83 Q120 51 246 79 Q351 42 496 69 Q650 100 807 61 Q941 38 1096 79 Q1248 41 1370 76 Q1531 40 1573 156 Q1590 292 1567 413 Q1604 537 1574 654 Q1595 764 1550 865 Q1458 905 1346 870 Q1190 917 1070 881 Q892 909 759 876 Q598 924 462 873 Q318 913 192 873 Q58 889 31 762 Q-3 630 28 509 Q0 375 29 258Z';
+const TOWN='M-157 269 Q-181 160 -67 111 Q12 23 143 36 Q255 -73 421 -27 Q577 -87 736 -33 Q884 -95 1049 -17 Q1209 -91 1361 -25 Q1557 -25 1631 107 Q1744 110 1768 278 Q1817 419 1715 556 Q1787 704 1688 852 Q1623 987 1459 960 Q1258 1041 1098 950 Q933 1033 762 977 Q568 1030 407 944 Q233 1026 95 904 Q-97 921 -133 775 Q-214 627 -143 470 Q-198 363 -157 269Z';
+
 export function finishLandscape(root){
-  const r=rand(72561);
-  // The original 1600x900 city stays in place. A second backdrop continues outside its bounds.
-  const countryside=el('g',{'aria-hidden':'true'},null);
-  root.insertBefore(countryside,root.firstChild);
-  el('rect',{x:-270,y:-180,width:2140,height:1260,fill:'#d6e8c3'},countryside);
-  // Farm parcels: soft, unmapped agricultural fields beyond the urban footprint.
-  const fields=['#e9e4b7','#d7e8b2','#c3dda8','#e2eabb','#d0e1bc','#e7ddb5'];
-  for(let y=-180;y<1080;y+=48){for(let x=-270;x<1870;x+=68){
-    if(x>=-5&&x<=WIDTH+5&&y>=-5&&y<=HEIGHT+5)continue;
-    el('rect',{x:x+3,y:y+3,width:61,height:41,rx:3,fill:fields[Math.floor(r()*fields.length)],opacity:.70},countryside);
-    if(r()<.34)trace(`M${x+11} ${y+8}L${x+11} ${y+40}`,'#f7f0cc',.9,countryside,{opacity:.68});
-  }}
-  // Wooded slopes and scattered trees outside the city, not random objects over town roads.
-  for(let i=0;i<460;i++){
-    const x=-255+r()*2110,y=-170+r()*1240;
-    if(x>25&&x<1575&&y>25&&y<875)continue;
-    el('circle',{cx:x.toFixed(1),cy:y.toFixed(1),r:(2+r()*5).toFixed(1),fill:r()<.5?'#99c88d':'#b3d69d',opacity:.55},countryside);
+  const original=[...root.childNodes];root.replaceChildren();
+  const defs=el('defs',{},root);
+  path(TOWN,'#fff',el('clipPath',{id:'outbreak-town-clip'},defs));
+  path(CORE,'#fff',el('clipPath',{id:'outbreak-core-clip'},defs));
+  const dry=el('clipPath',{id:'outbreak-fringe-dry'},defs);
+  const north=[],south=[];
+  for(let x=-280;x<=1880;x+=8){north.push(`${x},${(riverY(x)-81).toFixed(1)}`);south.push(`${x},${(riverY(x)+81).toFixed(1)}`);}
+  path(`M-280,-200L1880,-200L${north.reverse().join('L')}Z`,'#fff',dry);
+  path(`M${south.join('L')}L1880,1100L-280,1100Z`,'#fff',dry);
+
+  // Farm parcels are behind the built-up city, never on top of the road network.
+  const land=el('g',{'aria-hidden':'true'},root),r=random(771944);
+  el('rect',{x:-280,y:-200,width:2160,height:1300,fill:'#d5e7c3'},land);
+  const colors=['#c2dda8','#e6e6b7','#d3e3a9','#dbe9bf','#b9d6a2','#e5dfb1'];
+  for(let y=-225;y<1130;y+=105)for(let x=-325;x<1930;x+=148){
+    const dx=(r()-.5)*30,dy=(r()-.5)*20,w=105+r()*47,h=67+r()*39;
+    path(`M${x+dx},${y+dy}l${w},${-8+r()*16}l${-10+r()*18},${h}l${-w+9},${5-r()*10}Z`,colors[Math.floor(r()*colors.length)],land,{opacity:.82});
+    if(r()<.48)for(let k=0;k<5;k++)line(`M${x+dx+13+k*14} ${y+dy+12}l${-5+k*.8} ${h-22}`,'#f0edcb',1,land,{opacity:.55});
   }
-  // The built-up footprint ends inside the old canvas. The irregular, unbuilt fringe
-  // covers cut-off street-grid tips without hiding any planned public facility/parcel.
-  const edge=el('g',{'aria-hidden':'true'},root);
-  const top=[],bottom=[],left=[],right=[];
-  for(let x=-25;x<=1625;x+=25){top.push([x,23+6*Math.sin(x/87)+4*Math.sin(x/29)]);bottom.push([x,876+6*Math.sin(x/103)+3*Math.cos(x/37)]);}
-  for(let y=-25;y<=925;y+=25){left.push([35+6*Math.sin(y/91)+3*Math.sin(y/29),y]);right.push([1565+6*Math.sin(y/78)+3*Math.cos(y/34),y]);}
-  el('path',{d:shape([[-260,-180],[1860,-180],...top.slice().reverse()]),fill:'#d4e7bd'},edge);
-  el('path',{d:shape([[1860,1080],[-260,1080],...bottom]),fill:'#cfe4b8'},edge);
-  el('path',{d:shape([[-260,-180],...left,[-260,1080]]),fill:'#c8e2b6',opacity:.8},edge);
-  el('path',{d:shape([[1860,-180],...right,[1860,1080]]),fill:'#d2e7c0',opacity:.83},edge);
-  // Quiet rural roads connect the outskirts to the existing city arteries; no abrupt ends.
-  const outskirts=el('g',{'aria-hidden':'true'},root);
-  for(const x of [350,850,1250]){
-    road(`M${x} -180L${x} 54`,11,outskirts,true);
-    road(`M${x} 862L${x} 1080`,11,outskirts,true);
+  for(let i=0;i<270;i++){
+    const x=-265+r()*2130,y=-185+r()*1250;
+    el('circle',{cx:x.toFixed(1),cy:y.toFixed(1),r:(2+r()*5).toFixed(1),fill:r()<.5?'#a3cc8f':'#8fbe80',opacity:.53},land);
   }
-  for(const y of [230,590,770]){
-    road(`M-270 ${y}L60 ${y}`,9,outskirts,y===590);
-    road(`M1540 ${y}L1870 ${y}`,9,outskirts,y===590);
+
+  path(TOWN,'#eef2eb',root,{stroke:'#d1ddcc','stroke-width':3});
+  const suburb=el('g',{'clip-path':'url(#outbreak-town-clip)','aria-hidden':'true'},root);
+  const streets=el('g',{'clip-path':'url(#outbreak-fringe-dry)'},suburb);
+  const routes=[];
+  const addRoad=(d,w=6,major=false)=>{
+    road(d,w,streets,major);
+    const probe=el('path',{d,fill:'none',stroke:'none'},streets),length=probe.getTotalLength(),pts=[];
+    for(let t=0;t<=length;t+=8){const p=probe.getPointAtLength(t);pts.push([p.x,p.y]);}
+    probe.remove();routes.push(pts);
+  };
+  // Roads reach the old grid only at its existing street centers.
+  for(const d of [
+    'M-240 224C-141 205 -54 222 50 230','M-240 584C-123 549 -39 592 50 590',
+    'M1550 230C1634 216 1706 260 1840 239','M1550 590C1651 554 1768 601 1855 579',
+    'M350 50C323 -14 289 -67 262 -146','M850 50C827 -26 879 -78 910 -167',
+    'M1250 50C1289 -4 1317 -82 1380 -164','M350 850C300 901 267 973 207 1097',
+    'M850 850C886 912 847 997 876 1090','M1250 850C1278 929 1370 976 1380 1100'
+  ])addRoad(d,11,true);
+  for(const d of [
+    'M-240 775C-121 798 -33 747 50 770','M1550 770C1654 741 1768 799 1850 754',
+    'M-176 143C-102 91 -8 65 90 85','M1500 93C1593 70 1689 144 1764 194',
+    'M-164 850C-75 916 26 948 150 878','M1440 878C1545 955 1651 911 1717 835',
+    'M-105 155C-62 290 -56 393 -125 479','M1676 197C1641 338 1704 410 1701 556',
+    'M-136 316Q-28 275 46 305','M-143 709Q-19 686 35 722',
+    'M1571 311Q1660 291 1744 350','M1565 693Q1681 643 1732 706',
+    'M120 84Q210 -15 330 47','M1043 73Q1132 -25 1250 50',
+    'M450 885Q540 971 655 888','M989 896Q1086 1000 1220 872'
+  ])addRoad(d,5);
+
+  // Peripheral buildings are not graph nodes. No building covers a street.
+  const houses=el('g',{},suburb);
+  const distance=(x,y,pts)=>{
+    let nearest=Infinity;
+    for(let k=1;k<pts.length;k++){
+      const [ax,ay]=pts[k-1],[bx,by]=pts[k],dx=bx-ax,dy=by-ay;
+      const t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy||1)));
+      nearest=Math.min(nearest,Math.hypot(x-ax-t*dx,y-ay-t*dy));
+    }return nearest;
+  };
+  for(let i=0;i<690;i++){
+    const x=-145+r()*1880,y=-55+r()*1020;
+    if(x<=-150||x>=1740||y<=-60||y>=980||x>65&&x<1545&&y>100&&y<856)continue;
+    if(Math.abs(y-riverY(x))<127||routes.some(route=>distance(x,y,route)<17))continue;
+    const w=8+r()*11,h=7+r()*10;
+    el('rect',{x:x-w/2,y:y-h/2,width:w,height:h,rx:1,
+      transform:`rotate(${(-18+r()*36).toFixed(1)} ${x} ${y})`,
+      fill:r()<.26?'#d6dad6':'#c4cdcb',stroke:'#bac5c3','stroke-width':.5},houses);
   }
-  // An existing ring road continues into the farms along the northern boundary.
-  road('M-270 15L1870 15',14,outskirts,true);
-  // Continuous river through countryside, aligned exactly to the town's existing riverY.
-  const outsideRiver=el('g',{'aria-hidden':'true'},root);
-  for(const [a,b] of [[-270,58],[1542,1870]]){
-    el('path',{d:riverBand(-80,80,a,b),fill:'#a8d5a0'},outsideRiver);
-    el('path',{d:riverBand(-54,54,a,b),fill:'#84cde9'},outsideRiver);
-    trace(riverRoad(-55,a,b),'#b8dcba',2,outsideRiver);
-    trace(riverRoad(55,a,b),'#b8dcba',2,outsideRiver);
-  }
-  // Insert real riverside access BEFORE the water/crossings and public labels.
-  // The avenue runs on dry ground (bank ends at ±80; roadway centers at ±91).
-  const water=root.querySelector('g[aria-label="Rio central"]');
-  const quay=el('g',{'aria-hidden':'true'},null);
-  root.insertBefore(quay,water||null);
-  for(const bank of [-1,1]){
-    // Small riparian footpath beside continuous planted banks.
-    trace(riverRoad(bank*68,-40,1640),'#ecf2e4',2,quay,{opacity:.95});
-    for(let x=0;x<WIDTH;x+=26){
-      const y=riverY(x)+bank*(64+((x*7)%8));
-      el('circle',{cx:x,cy:y,r:2.4+(x%3),fill:'#78b781',opacity:.86},quay);
+
+  // Same channel equation inside and outside the interactive core.
+  path(ribbon(-80,80),'#9dcf99',root);
+  path(ribbon(-54,54),'#84cde9',root,{stroke:'#a8d4d7','stroke-width':1.5});
+  const core=el('g',{'clip-path':'url(#outbreak-core-clip)','data-layer':'urban-core'},root);
+  for(const child of original)core.append(child);
+  // Bankside boulevards go BELOW the parcel layer, NOT over homes or parks.
+  // Existing north/south grid streets connect directly at the avenue intersections.
+  const grid=core.querySelector('g[clip-path="url(#city-dry-land)"]');
+  if(grid){
+    const quay=el('g',{'clip-path':'url(#city-dry-land)','aria-hidden':'true'},null);
+    grid.after(quay);
+    for(const bank of [-1,1]){
+      road(riverline(bank*89,-30,1630),7,quay);
+      line(riverline(bank*79,-30,1630),'#7ab780',1.6,quay);
     }
-    road(riverRoad(bank*91,-65,1665),8,quay);
-    // Every perpendicular local street reaches a riverside junction, not a dead-end in vegetation.
-    for(let x=50;x<WIDTH;x+=100){
-      if(bridges.some(b=>Math.abs(b.x-x)<4))continue;
-      const y=riverY(x);
-      road(`M${x} ${y+bank*76}L${x} ${y+bank*96}`,7,quay);
-    }
   }
-  // Some horizontal streets meet the banks too: extend short tips to the same boulevard.
-  const levels=[...Array.from({length:10},(_,i)=>50+i*90),230,590,770];
-  for(const y of new Set(levels))for(const side of [-1,1]){
-    let previous=null;
-    for(let x=0;x<=WIDTH;x+=2){
-      const val=y-riverY(x)-side*85;
-      if(previous&&val*previous.value<=0){
-        const hit=x-2+2*Math.abs(previous.value)/(Math.abs(previous.value)+Math.abs(val)||1);
-        const slope=(riverY(hit+2)-riverY(hit-2))/4;
-        if(Math.abs(slope)<.18)break; // avoid artificial long feeder lines on almost parallel streets
-        const target=hit-side*7/slope;
-        if(target>=0&&target<=WIDTH&&Math.abs(target-hit)<35)road(`M${hit.toFixed(1)} ${y}L${target.toFixed(1)} ${y}`,7,quay);
-      }
-      previous={value:val};
-    }
-  }
-  // The original bridge layer remains above the water and the avenues.
 }
