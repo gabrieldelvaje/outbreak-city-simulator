@@ -1,8 +1,6 @@
 /* The pale-green fringe in the supplied reference has no artificial square fields. */
 #map-world > g:first-of-type > rect { display:none; }
-/* Remove only the unnecessary white lines in the countryside marked by the user.
-   They are generated separately from the original inner-city reference SVG.
-   Keep the city's white streets, yellow avenues, river and interactive graph intact. */
+/* Remove unnecessary white lines in the rural fringe; keep the inner city. */
 #map-continuations > path[fill="none"][stroke="#f8f8f8"],
 #map-world > g:first-of-type > path[fill="none"][stroke="#f9faf8"] {
   display:none;
@@ -13,7 +11,13 @@
 .bridge-label{font-size:8px;stroke-width:2.3px}
 .river-label{font-size:11px;stroke-width:1px}
 
-/* Larger graph nodes; SVG r is animatable and keeps each circle centered on its building. */
+/* Open bridges have no white overlay. The dashed red route and no-entry badge
+   are visible ONLY while that crossing has been blocked through its control. */
+#bridge-layer .bridge-deck{display:none}
+#bridge-layer .bridge-closure-indicator{display:none;pointer-events:none}
+#bridge-layer .bridge-hit.bridge-closed .bridge-closure-indicator{display:inline}
+
+/* Larger graph nodes; animate each circle about its own center. */
 #homes-layer .home-node > circle:first-of-type{
   r:3.1px;
   opacity:.96;
@@ -28,7 +32,7 @@
   stroke-width:1.6px;
   opacity:1;
 }
-/* Keep the invisible hit area larger than the animated dot, without drawing a ring. */
+/* Invisible hit area remains larger than the dot without drawing a ring. */
 #homes-layer .home-node > circle:last-of-type{
   r:6.2px;
   stroke:none;
