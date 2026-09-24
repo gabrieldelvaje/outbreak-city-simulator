@@ -5,6 +5,8 @@
 #map-world > g:first-of-type > path[fill="none"][stroke="#f9faf8"] {
   display:none;
 }
+/* Keep pale-blue outlines visible around the white streets of the city. */
+#reference-city svg[data-map-base] > path[fill="#f8f8f8"] { stroke:#d3dce7 !important; }
 /* Preserve a cartographic, uncluttered scale for the user-provided reference. */
 .district-label{font-size:10px;stroke-width:2.5px;fill:#536369;letter-spacing:.015em}
 .place-label{font-size:8px;stroke-width:2.3px;fill:#40535b}
