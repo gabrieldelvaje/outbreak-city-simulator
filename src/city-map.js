@@ -1,43 +1,125 @@
 import {WIDTH,HEIGHT,riverY,districts,bridges,parks,places,placeColors,placeGlyphs} from './city-data.js';
+
+// Every visual object shares the same parcel coordinates. Nothing is randomly placed on top of a road or river.
 const NS='http://www.w3.org/2000/svg';
-const svgEl=(tag,attrs={},parent)=>{const el=document.createElementNS(NS,tag);for(const [key,val] of Object.entries(attrs))el.setAttribute(key,String(val));if(parent)parent.append(el);return el;};
-const path=(d,stroke,width,parent,extra={})=>svgEl('path',{d,fill:'none',stroke,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',...extra},parent);
-const text=(str,x,y,parent,klass,extra={})=>{const t=svgEl('text',{x,y,class:klass,...extra},parent);t.textContent=str;return t;};
-const makeRandom=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-const isPark=(x,y)=>parks.some(p=>Math.pow((x-p.x)/p.rx,2)+Math.pow((y-p.y)/p.ry,2)<1.1);
-const riverPath=()=>{const north=[],south=[];for(let x=-20;x<=WIDTH+20;x+=16){north.push(`${x},${(riverY(x)-48).toFixed(1)}`);south.push(`${x},${(riverY(x)+48).toFixed(1)}`);}return `M${north.join('L')}L${south.reverse().join('L')}Z`;};
+const el=(tag,attrs={},parent)=>{const n=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,String(v));parent?.append(n);return n;};
+const rect=(x,y,w,h,fill,parent,extra={})=>el('rect',{x,y,width:w,height:h,fill,...extra},parent);
+const line=(d,stroke,width,parent,extra={})=>el('path',{d,fill:'none',stroke,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',...extra},parent);
+const label=(value,x,y,parent,klass,extra={})=>{const n=el('text',{x,y,class:klass,...extra},parent);n.textContent=value;return n;};
+const rng=(seed)=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+const riverPoints=(offset)=>{const pts=[];for(let x=-24;x<=WIDTH+24;x+=8)pts.push([x,riverY(x)+offset]);return pts;};
+const poly=(points)=>'M'+points.map(([x,y])=>`${x.toFixed(1)},${y.toFixed(1)}`).join('L')+'Z';
+const band=(low,high)=>poly([...riverPoints(low),...riverPoints(high).reverse()]);
+const northLand=()=>poly([[-30,-30],[WIDTH+30,-30],...riverPoints(-80).reverse()]);
+const southLand=()=>poly([...riverPoints(80),[WIDTH+30,HEIGHT+30],[-30,HEIGHT+30]]);
+const parcelKey=(x,y)=>`${x}:${y}`;
+const reserved=new Map(places.map(p=>[parcelKey(p.x,p.y),p]));
+const greenBlocks=new Set(parks.map(p=>parcelKey(p.x,p.y)));
+const onLand=(x,y,margin=0)=>Math.abs(y-riverY(x))>80+margin;
+const regionAt=(x,y)=>y<riverY(x)?(x<800?'norte-verde':x<1350?'jardim-do-rio':'vale-do-sol'):(x<330?'vila-industrial':x<810?'centro-civico':x<1260?'parque-leste':'colinas-do-sul');
+const drawRoad=(d,w,group,kind='minor')=>{line(d,kind==='highway'?'#aeb8b5':kind==='major'?'#d1b873':'#e2e6e3',w+4,group);line(d,kind==='highway'?'#f8f9f7':kind==='major'?'#efcf7e':'#ffffff',w,group);};
+function parkParcel(x,y,g,random){rect(x-43,y-36,86,72,'#a8d39d',g,{rx:3,stroke:'#94c78e','stroke-width':1});for(let i=0;i<15;i++){const tx=x-36+random()*72,ty=y-29+random()*58;el('circle',{cx:tx,cy:ty,r:2.5+random()*3,fill:random()<.5?'#82b77c':'#93c989'},g);}line(`M${x-41} ${y+25} Q${x} ${y-11} ${x+41} ${y-23}`,'#f6f7eb',2.2,g);}
+function footprint(p,layer){
+  const g=el('g',{class:'facility-footprint','aria-hidden':'true'},layer),x=p.x,y=p.y;
+  if(p.type==='park'){parkParcel(x,y,g,rng(x*7+y));return;}
+  const ground=p.type==='school'?'#e5eddf':p.type==='hospital'?'#f5e6e7':p.type==='civic'?'#ebedf0':p.type==='market'?'#f5eee1':'#e6e8ee';
+  rect(x-43,y-36,86,72,ground,g,{rx:2,stroke:'#d3d8d2','stroke-width':1});
+  const building=(bx,by,bw,bh,color)=>rect(bx,by,bw,bh,color,g,{rx:2,stroke:'#bbc4c7','stroke-width':1});
+  if(p.type==='school'){
+    building(x-31,y-21,62,30,'#9daeb5');building(x-21,y-16,42,8,'#bbc9cc');
+    rect(x-26,y+16,52,11,'#d4c9a5',g,{rx:2});line(`M${x-26} ${y+21}H${x+26}`,'#fff8e1',1,g);
+  }else if(p.type==='hospital'){
+    building(x-29,y-24,58,46,'#abbac0');building(x-40,y-11,80,21,'#bcc9cc');
+    rect(x-8,y-10,16,16,'#fff',g,{rx:3});line(`M${x} ${y-7}v10 M${x-5} ${y-2}h10`,'#d35b64',2.8,g);
+    rect(x-31,y+24,62,5,'#e9e0d7',g);
+  }else if(p.type==='civic'){
+    building(x-31,y-21,62,39,'#acb9c3');rect(x-36,y+19,72,9,'#e2e6e7',g);
+    for(const dx of [-19,-7,5,17])rect(x+dx,y+2,5,15,'#e8eff2',g);
+    line(`M${x-35} ${y-22}H${x+35}`,'#8c9ca8',3,g);
+  }else if(p.type==='market'){
+    building(x-34,y-19,68,35,'#b6b9b7');rect(x-34,y-19,68,8,'#dc955a',g);
+    for(const dx of [-20,-5,10])rect(x+dx,y-5,9,11,'#e3edf0',g);
+    for(const dx of [-22,-8,6,20])line(`M${x+dx} ${y+22}v8`,'#fff',1,g);
+  }else{
+    building(x-34,y-23,31,43,'#aeb9c8');building(x+3,y-27,31,47,'#9daebd');
+    for(const dx of [-29,-18,-7,8,19,30])for(const dy of [-15,-4,7])rect(x+dx,y+dy,5,5,'#e6ecee',g);
+    rect(x-28,y+24,56,5,'#d2d7db',g);
+  }
+  // The building and the clickable hub use exactly the same parcel center.
+}
+function drawBridge(b,root){
+  const {x,y}=b,g=el('g',{class:'bridge-hit','data-bridge':b.id,tabindex:0,role:'button','aria-label':`Inspecionar ${b.name}`},root);
+  // Approaches line up with the road at this same x; only these decks cross the water.
+  drawRoad(`M${x} ${y-115} L${x} ${y+115}`,12,g,'major');
+  line(`M${x-6} ${y-55}L${x-6} ${y+55}`,'#f7f8f4',1.5,g,{class:'bridge-deck'});
+  line(`M${x+6} ${y-55}L${x+6} ${y+55}`,'#f7f8f4',1.5,g);
+  rect(x-14,y-17,28,34,'transparent',g,{class:'bridge-hit-target'});
+  label(b.name,x+18,y+4,g,'bridge-label');
+}
 export function drawCity(root){
-  root.replaceChildren();const rand=makeRandom(749137);
-  svgEl('rect',{width:WIDTH,height:HEIGHT,fill:'#eff2f0'},root);
-  const land=svgEl('g',{},root);
-  // Large green areas and smaller urban parks, all in flat map colors.
-  for(const p of parks){svgEl('ellipse',{cx:p.x,cy:p.y,rx:p.rx,ry:p.ry,fill:'#b9dba6'},land);svgEl('ellipse',{cx:p.x+13,cy:p.y-8,rx:p.rx*.58,ry:p.ry*.52,fill:'#a7d098',opacity:'.55'},land);}
-  const lakes=svgEl('g',{},root);for(const [x,y,rx,ry] of [[110,552,25,13],[710,85,26,14],[1463,691,37,19]])svgEl('ellipse',{cx:x,cy:y,rx,ry,fill:'#86cee9'},lakes);
-  const buildings=svgEl('g',{'aria-hidden':'true'},root);
-  for(let y=18;y<HEIGHT-10;y+=17){for(let x=18;x<WIDTH-10;x+=19){const px=x+rand()*8,py=y+rand()*7;if(Math.abs(py-riverY(px))<71||isPark(px,py)||rand()<.22)continue;if(Math.abs(px-340)<16||Math.abs(px-800)<17||Math.abs(px-1270)<16)continue;const w=6+rand()*10,h=5+rand()*9;svgEl('rect',{x:px.toFixed(1),y:py.toFixed(1),width:w.toFixed(1),height:h.toFixed(1),rx:'.8',fill:rand()<.16?'#d8dbd7':'#c5ccce'},buildings);}}
-  const streets=svgEl('g',{'aria-hidden':'true'},root);
-  for(let x=64;x<WIDTH;x+=102){const d=`M${x} -10 C${x+22} 180 ${x-22} 450 ${x+15} 910`;path(d,'#dbe1df',10,streets);path(d,'#ffffff',7,streets);}
-  for(let y=63;y<HEIGHT;y+=96){const d=`M-10 ${y} C400 ${y-32} 1000 ${y+29} 1610 ${y+3}`;path(d,'#dbe1df',10,streets);path(d,'#ffffff',7,streets);}
-  const arteries=svgEl('g',{'aria-hidden':'true'},root);const major=[
-    'M-20 220 C250 236 475 210 690 251 S1140 258 1620 194',
-    'M-20 590 C265 550 465 607 735 625 S1220 680 1620 642',
-    'M115 0 C175 230 195 438 205 900',
-    'M340 -10 C346 265 337 585 360 910',
-    'M800 -10 C794 220 812 480 800 910',
-    'M1270 -10 C1255 230 1280 565 1260 910',
-    'M-30 875 C350 765 535 803 890 812 S1305 849 1630 788'];
-  for(const d of major){path(d,'#c5ac68',17,arteries);path(d,'#f7db89',12,arteries);}
-  const highways=svgEl('g',{'aria-hidden':'true'},root);for(const d of ['M-20 70 C370 115 745 25 1000 67 S1370 96 1620 36','M-20 860 C340 725 590 810 900 846 S1320 859 1620 850']){path(d,'#99a4a4',20,highways);path(d,'#f9faf8',14,highways);path(d,'#b9c0bf',1.5,highways);}
-  // Mask all ordinary streets at the water: only explicit bridge objects reconnect the banks.
-  const water=svgEl('g',{'aria-label':'Rio central'},root);svgEl('path',{d:riverPath(),fill:'#84cde9',stroke:'#d9edf0','stroke-width':3},water);
-  for(let x=0;x<WIDTH;x+=95){let y=riverY(x);path(`M${x} ${y-7}q22 -6 44 -1`,'#a9def0',1.2,water,{opacity:'.65'});}
-  text('RIO CENTRAL',730,riverY(730)+5,water,'river-label',{'text-anchor':'middle'});
-  const crossings=svgEl('g',{id:'bridge-layer'},root);
-  for(const b of bridges){const g=svgEl('g',{class:'bridge-hit','data-bridge':b.id,tabindex:0,role:'button','aria-label':`Inspecionar ${b.name}`},crossings);const cy=b.y;path(`M${b.x} ${cy-72} L${b.x} ${cy+72}`,'#b2bdbd',18,g,{class:'bridge-deck'});path(`M${b.x} ${cy-72} L${b.x} ${cy+72}`,'#fcfaf3',12,g);path(`M${b.x} ${cy-72} L${b.x} ${cy+72}`,'#e8c771',2,g,{class:'bridge-hit-line'});text(b.name,b.x+12,cy+2,g,'bridge-label');}
-  const treeLayer=svgEl('g',{'aria-hidden':'true'},root);for(const p of parks){for(let n=0;n<50;n++){let x=p.x+(rand()*2-1)*p.rx,y=p.y+(rand()*2-1)*p.ry;if(Math.pow((x-p.x)/p.rx,2)+Math.pow((y-p.y)/p.ry,2)>.9||Math.abs(y-riverY(x))<52)continue;svgEl('circle',{cx:x.toFixed(1),cy:y.toFixed(1),r:2+rand()*3,fill:rand()<.5?'#96c98a':'#a4d197',opacity:'.7'},treeLayer);}}
-  const flows=svgEl('g',{id:'flows-layer',class:'map-layer-hidden'},root);for(const b of bridges)path(`M${b.x-80} ${b.y-145}Q${b.x+43} ${b.y} ${b.x+80} ${b.y+165}`,'#438ac7',2.8,flows,{class:'flow','data-flow-bridge':b.id});
-  const homes=svgEl('g',{id:'homes-layer'},root);let homeCount=0;for(let n=0;n<450;n++){const x=20+rand()*1560,y=20+rand()*860;if(Math.abs(y-riverY(x))<74||isPark(x,y)||Math.abs(x-340)<22||Math.abs(x-800)<22||Math.abs(x-1270)<22)continue;if(rand()>.44)continue;homeCount++;let region=y<riverY(x)?(x<700?'norte-verde':x<1260?'jardim-do-rio':'vale-do-sol'):(x<340?'vila-industrial':x<760?'centro-civico':x<1260?'parque-leste':'colinas-do-sul');const g=svgEl('g',{class:'home-node','data-home':`casa-${String(homeCount).padStart(3,'0')}`,'data-region':region,tabindex:0,role:'button','aria-label':`Inspecionar residência ${homeCount}`},homes);svgEl('circle',{cx:x.toFixed(1),cy:y.toFixed(1),r:4.5,fill:'#45966c',stroke:'#fff','stroke-width':1.6},g);}
-  const labels=svgEl('g',{},root);for(const d of districts){text(d.name,d.x,d.y,labels,'district-label',{'text-anchor':'middle'});text(d.type,d.x,d.y+16,labels,'district-caption',{'text-anchor':'middle'});}
-  const hubs=svgEl('g',{id:'places-layer'},root);for(const p of places){const g=svgEl('g',{class:'map-place','data-place':p.id,role:'button',tabindex:0,'aria-label':`Inspecionar ${p.name}`},hubs);svgEl('circle',{cx:p.x,cy:p.y,r:12,fill:placeColors[p.type],stroke:'white','stroke-width':2.5,class:'place-bubble'},g);text(placeGlyphs[p.type],p.x,p.y+4,g,'',{'text-anchor':'middle',fill:'white','font-size':p.type==='hospital'?15:10,'font-weight':800});text(p.name,p.x+17,p.y+4,g,'place-label');}
+  root.replaceChildren();const random=rng(749137);
+  rect(0,0,WIDTH,HEIGHT,'#f0f2ef',root);
+  const defs=el('defs',{},root),clip=el('clipPath',{id:'city-dry-land'},defs);
+  el('path',{d:northLand(),fill:'#fff'},clip);el('path',{d:southLand(),fill:'#fff'},clip);
+
+  // Riparian vegetation is a continuous corridor: no ordinary street/building can cross it.
+  el('path',{d:band(-80,80),fill:'#9ed09a'},root);
+  const streets=el('g',{'clip-path':'url(#city-dry-land)','aria-hidden':'true'},root);
+  // A shared block grid: parcels sit BETWEEN roads, never underneath them.
+  for(let x=50;x<WIDTH;x+=100){if(bridges.some(b=>Math.abs(b.x-x)<26))continue;drawRoad(`M${x} -20 L${x} ${HEIGHT+20}`,7,streets);}
+  for(let y=50;y<HEIGHT;y+=90)drawRoad(`M-20 ${y}L${WIDTH+20} ${y}`,7,streets);
+  for(const x of bridges.map(b=>b.x))drawRoad(`M${x} -20L${x} ${HEIGHT+20}`,12,streets,'major');
+  for(const y of [230,590,770])drawRoad(`M-20 ${y}L${WIDTH+20} ${y}`,12,streets,'major');
+  drawRoad(`M-20 15 L${WIDTH+20} 15`,15,streets,'highway');
+
+  const lots=el('g',{'clip-path':'url(#city-dry-land)','aria-hidden':'true'},root),homes=el('g',{id:'homes-layer'},root);
+  let homeCount=0;
+  for(let y=95;y<=815;y+=90)for(let x=100;x<=1500;x+=100){
+    if(!onLand(x,y,100))continue; // Entire block remains clear of the green river corridor.
+    const key=parcelKey(x,y),p=reserved.get(key),isGreen=greenBlocks.has(key);
+    if(p){footprint(p,lots);continue;}
+    if(isGreen){parkParcel(x,y,lots,random);continue;}
+    const industrial=y>680&&x<390;
+    rect(x-42,y-35,84,70,industrial?'#e8eae8':'#f8f9f6',lots,{rx:2,stroke:'#e1e6e2','stroke-width':1});
+    if(industrial){
+      rect(x-34,y-24,57,34,'#c6cdd0',lots,{rx:1,stroke:'#b5bfc4','stroke-width':1});
+      rect(x-30,y-22,46,3,'#aeb8be',lots);rect(x+8,y+17,25,13,'#d7dfe0',lots);
+      continue;
+    }
+    // Buildings are generated inside their own parcel and homes attach to real building centers.
+    for(let row=0;row<2;row++)for(let col=0;col<3;col++){
+      if(random()<.12)continue;
+      const bx=x-32+col*24+random()*3,by=y-26+row*29+random()*3;
+      const w=13+random()*5,h=13+random()*7;
+      rect(bx,by,w,h,random()<.18?'#d6dbd9':'#c5cccd',lots,{rx:1,stroke:'#bfc7c8','stroke-width':.5});
+      if(homeCount>=230||random()>.43)continue;
+      homeCount++;
+      const cx=bx+w/2,cy=by+h/2;
+      const node=el('g',{class:'home-node','data-home':`casa-${String(homeCount).padStart(3,'0')}`,'data-region':regionAt(cx,cy),role:'button',tabindex:0,'aria-label':`Inspecionar residência ${homeCount}`},homes);
+      el('circle',{cx,cy,r:4,fill:'#408c65',stroke:'#fff','stroke-width':1.2},node);
+    }
+  }
+  // Repaint both banks and the channel AFTER the parcels: their boundaries remain uninterrupted.
+  const river=el('g',{'aria-label':'Rio central'},root);
+  el('path',{d:band(-54,54),fill:'#84cde9',stroke:'#a8d4d7','stroke-width':1.5},river);
+  for(const offset of [-61,61])line('M'+riverPoints(offset).map(([x,y])=>`${x},${y.toFixed(1)}`).join('L'),'#76b37d',2,river,{opacity:'.7'});
+  label('RIO CENTRAL',735,riverY(735)+5,river,'river-label',{'text-anchor':'middle'});
+
+  const crossings=el('g',{id:'bridge-layer'},root);for(const b of bridges)drawBridge(b,crossings);
+  const flow=el('g',{id:'flows-layer',class:'map-layer-hidden'},root);
+  for(const b of bridges)line(`M${b.x} ${b.y-105} L${b.x} ${b.y+105}`,'#367dc6',2.5,flow,{class:'flow','data-flow-bridge':b.id});
+
+  // Human-readable district names do not establish geometry; clickable places are linked to footprints above.
+  const districtLayer=el('g',{'aria-hidden':'true'},root);
+  for(const d of districts){label(d.name,d.x,d.y,districtLayer,'district-label',{'text-anchor':'middle'});}
+  const hubs=el('g',{id:'places-layer'},root);
+  for(const p of places){
+    const g=el('g',{class:'map-place','data-place':p.id,role:'button',tabindex:0,'aria-label':`Inspecionar ${p.name}`},hubs);
+    // Transparent square enlarges the hit target to the entire facility/park block.
+    rect(p.x-42,p.y-34,84,68,'transparent',g,{rx:3});
+    el('circle',{cx:p.x,cy:p.y-5,r:12,fill:placeColors[p.type],stroke:'#fff','stroke-width':2.5,class:'place-bubble'},g);
+    label(placeGlyphs[p.type],p.x,p.y-1,g,'',{'text-anchor':'middle',fill:'#fff','font-size':p.type==='hospital'?15:10,'font-weight':800});
+    label(p.type==='school'?'Escola':p.type==='market'?'Mercado':p.type==='hospital'?'Hospital':p.type==='civic'?'Prefeitura':p.type==='office'?'Empresa':'Praça',p.x,p.y+27,g,'place-label',{'text-anchor':'middle','font-size':10});
+  }
   return {homeCount};
 }
