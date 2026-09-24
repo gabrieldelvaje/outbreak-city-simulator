@@ -1,5 +1,6 @@
 import {extendReferenceMap} from './map-extensions.js';
 import {normalizeReferenceStreets} from './normalize-streets.js';
+import {places,placeColors} from './city-data.js';
 
 // Keep home IDs stable. These markers do not sit on residential roofs; houses
 // 20 and 63 were the green dots drawn directly on the north and central bridges.
@@ -20,6 +21,25 @@ function removeUnsitedHomes(root){
   if(!homes)return;
   for(const id of UNSITED_HOME_IDS){
     homes.querySelector(`[data-home="casa-${String(id).padStart(3,'0')}"]`)?.remove();
+  }
+}
+
+// Match the other building footprints: one flat rectangle in its category color.
+// Preserve the interactive graph bubble, label, hit area and each building's
+// existing size/position. Parks remain unchanged.
+function simplifyPublicBuildings(root){
+  const typeById=new Map(places.map(place=>[place.id,place.type]));
+  for(const facility of root.querySelectorAll('#places-layer .map-place')){
+    const type=typeById.get(facility.dataset.place);
+    if(!type||type==='park')continue;
+    const roof=Array.from(facility.children).find(child=>child.localName==='rect');
+    if(!roof)continue;
+    roof.setAttribute('fill',placeColors[type]??'#607a98');
+    roof.setAttribute('stroke','#f8f8f8');
+    roof.setAttribute('stroke-width','0.9');
+    for(const child of Array.from(facility.children)){
+      if(child!==roof&&(child.localName==='rect'||child.localName==='path'))child.remove();
+    }
   }
 }
 
@@ -78,6 +98,7 @@ export function drawCity(root){
   queueMicrotask(()=>{
     extendReferenceMap(root);
     removeUnsitedHomes(root);
+    simplifyPublicBuildings(root);
     decorateBridges(root);
     void normalizeReferenceStreets(root);
   });
