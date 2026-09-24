@@ -1,0 +1,26 @@
+name: OUTBREAK simulator tests
+on:
+  push:
+    paths:
+      - 'simulator/**'
+      - '.github/workflows/simulator-tests.yml'
+  pull_request:
+    paths:
+      - 'simulator/**'
+      - '.github/workflows/simulator-tests.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check module syntax
+        run: node --check simulator/engine.mjs
+      - name: Test epidemiological engine invariants
+        run: node simulator/tests/test_engine.mjs
+      - name: Run reproducible demonstration
+        run: node simulator/examples/run_example.mjs > /dev/null
