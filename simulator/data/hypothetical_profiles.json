@@ -1,0 +1,24 @@
+{
+  "schema_version":"1.0.0",
+  "status":"DEMONSTRATION_HYPOTHESES_NOT_ESTIMATES_FROM_HISTORICAL_DATA",
+  "explanation":"The three profiles differ in per-encounter baseline hazard. All parameters below are hypotheses for demonstrating the network model; none is a WHO-derived pathogen-specific beta, R0, IFR, vaccine efficacy, or forecast.",
+  "profiles":{
+    "low":{"beta_per_effective_contact_hour":0.012},
+    "medium":{"beta_per_effective_contact_hour":0.030},
+    "high":{"beta_per_effective_contact_hour":0.065}
+  },
+  "defaults":{
+    "population":1200,"regions":6,"days":120,"initialInfections":2,"initialInfectionMode":"child_at_home","seed":20260924,"beds":24,
+    "latentDays":3,"infectiousDays":6,"symptomaticProbability":0.6,"clinicalAssessmentDays":2,"hospitalStayDays":7,"reportDelayDays":2,"detectionProbabilityIfSymptomatic":0.40,
+    "severeProbabilityByAge":{"child":0.005,"adult":0.025,"older":0.10},
+    "deathProbabilityIfSevereWithCareByAge":{"child":0.005,"adult":0.03,"older":0.14},
+    "deathProbabilityIfSevereWithoutCareByAge":{"child":0.02,"adult":0.10,"older":0.30},
+    "relativeSusceptibilityByAge":{"child":1,"adult":1,"older":1},
+    "contactHours":{"household":2.5,"school":0.8,"work":0.8,"retail":0.25,"community":0.35,"hospital":0.25},
+    "contactsPerPerson":{"household":12,"school":5,"work":4,"retail":2,"community":2,"hospital":2},
+    "alert":{"windowDays":7,"detectedCasesThreshold":5},
+    "vaccination":{"enabled":false,"availableDay":180,"dosesPerDay":35,"uptakeProbability":0.75,"daysToProtection":14,"infectionProtectionFraction":0.55,"severeProtectionFraction":0.60,"priority":"older_first"},
+    "interventions":[]
+  },
+  "limitations":["Values are invented scenario settings, not inferred from observational datasets.","Single pathogen, one-dose vaccine and permanent post-infection immunity in v1.","No births, migration, mutation, reinfection, waning immunity, test specificity or explicit aerosol-room model.","Outcomes are synthetic; do not interpret as clinical estimates or use for real-world decisions."]
+}
