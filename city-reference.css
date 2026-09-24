@@ -1,5 +1,12 @@
 /* The pale-green fringe in the supplied reference has no artificial square fields. */
 #map-world > g:first-of-type > rect { display:none; }
+/* Remove only the unnecessary white lines in the countryside marked by the user.
+   They are generated separately from the original inner-city reference SVG.
+   Keep the city's white streets, yellow avenues, river and interactive graph intact. */
+#map-continuations > path[fill="none"][stroke="#f8f8f8"],
+#map-world > g:first-of-type > path[fill="none"][stroke="#f9faf8"] {
+  display:none;
+}
 /* Preserve a cartographic, uncluttered scale for the user-provided reference. */
 .district-label{font-size:10px;stroke-width:2.5px;fill:#536369;letter-spacing:.015em}
 .place-label{font-size:8px;stroke-width:2.3px;fill:#40535b}
