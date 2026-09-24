@@ -1,0 +1,28 @@
+{
+  "dataset":"OUTBREAK historical reference — source observations, NOT synthetic people or fitted clinical parameters",
+  "manifest_source":"outbreak_historical_manifest.json generated from the seven project data sources",
+  "source_snapshot":"2026-09-24 project data package; historical records retain their original observation windows",
+  "total_observations":5965243,
+  "countries_reported":252,
+  "records_by_source":{
+    "WHO_COVID":257818,
+    "OXCGRT":3277993,
+    "WHO_FLUNET":1137897,
+    "WHO_FLUID":1189598,
+    "WHO_VPD_INCIDENCE":32057,
+    "WHO_VACCINATION":69853,
+    "WHO_MERS":27
+  },
+  "historical_schema":["country_iso3","country_name","who_region","pathogen_id","record_type","metric","date_start","date_end","frequency","age_group","stratum","value","unit","source_dataset","source_field"],
+  "source_notes":{
+    "WHO_COVID":"Weekly reported cases and deaths; not all infections or an infection-fatality probability.",
+    "OXCGRT":"National daily ordinal policy observations; NOT contact reduction or causal effectiveness.",
+    "WHO_FLUNET":"Virological surveillance samples/tests by origin and subtype; do not double count totals and subtypes.",
+    "WHO_FLUID":"ILI/SARI syndromic surveillance, not confirmed cases for a specific virus.",
+    "WHO_VPD_INCIDENCE":"Annual incidence rates with original unit and disease; not per-contact daily probability.",
+    "WHO_VACCINATION":"Coverage by antigen, target population, source category and year; not protection from a hypothetical novel infection.",
+    "WHO_MERS":"Country-level cumulative snapshot, not a time series of weekly cases."
+  },
+  "use_in_engine":"Descriptive historical context only. No value in this manifest is used to set beta, latentDays, infectiousDays, severeProbabilityByAge, deathProbability*, vaccine protection, bed capacity or intervention efficacy.",
+  "excluded_from_git":"Large original CSV/XLSX source extracts, 40 MB consolidated historical gzip and ~9 MB aggregate JSON remain in the research package rather than being silently embedded into the GitHub Pages map."
+}
