@@ -1,187 +1,151 @@
-import {places,bridges,districts,placeColors,placeGlyphs} from './city-data.js';
-// Vector tracing of the layout in the user's reference photo, not a replacement invented city.
-// Source illustration is square; preserved proportions inside the 1600x900 site viewport.
-const NS='http://www.w3.org/2000/svg',X0=346,Y0=10,S=1.245;
-const svg=(tag,attrs={},parent)=>{const e=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));parent?.append(e);return e;};
-const path=(d,fill,parent,attrs={})=>svg('path',{d,fill,...attrs},parent);
-const rect=(x,y,w,h,fill,parent,attrs={})=>svg('rect',{x,y,width:w,height:h,fill,...attrs},parent);
-const line=(d,color,width,parent,attrs={})=>path(d,'none',parent,{stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',...attrs});
-const text=(s,x,y,parent,cls,attrs={})=>{const t=svg('text',{x,y,class:cls,...attrs},parent);t.textContent=s;return t;};
-const rand=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-const road=(d,parent,kind='local')=>{const w=kind==='trunk'?6:kind==='arterial'?4.7:2.1;
-  line(d,kind==='trunk'?'#e4ae49':kind==='arterial'?'#edbd63':'#d9dfde',w+2.2,parent);
-  line(d,kind==='trunk'?'#ffca60':kind==='arterial'?'#ffcf79':'#fff',w,parent);
-};
-const waterShape=`M277 -36 C286 47 279 137 270 186 C265 223 272 250 307 259 C336 272 364 261 388 267 C438 283 482 345 544 363 C585 376 609 407 589 434 C571 463 511 467 462 479 C385 488 323 483 285 504 C258 520 260 602 230 735 L185 735 C212 646 214 537 242 494 C262 470 319 462 401 454 C486 443 530 426 531 405 C530 384 462 335 416 298 C388 280 358 278 316 277 C268 273 248 243 258 185 C268 113 265 39 247 -36 Z`;
-const riverEdgeLeft='M277 -36 C286 47 279 137 270 186 C265 223 272 250 307 259 C336 272 364 261 388 267 C438 283 482 345 544 363 C585 376 609 407 589 434 C571 463 511 467 462 479 C385 488 323 483 285 504 C258 520 260 602 230 735';
-const riverEdgeRight='M247 -36 C265 39 268 113 258 185 C248 243 268 273 316 277 C358 278 388 280 416 298 C462 335 530 384 531 405 C530 426 486 443 401 454 C319 462 262 470 242 494 C214 537 212 646 185 735';
-const parkShapes=[
-'M55 267 Q79 265 105 278 L221 302 L187 329 L145 332 L158 348 L110 379 L78 371 L62 344 Z',
-'M290 323 L336 308 L329 350 L378 361 L389 381 L322 381 L285 368 Z',
-'M471 192 L567 157 L590 203 L490 246 Z',
-'M391 534 L428 523 L451 574 L478 584 L493 650 L382 665 L378 602 Z',
-'M13 605 L74 625 L90 682 L0 680 Z'
+import {places, bridges, districts, placeColors, placeGlyphs} from './city-data.js';
+// OUTBREAK: tracing of the user-supplied flat city map, using original artwork as geometric reference.
+// All drawn primitives are SVG. The supplied photo is NOT embedded as a raster background.
+const NS='http://www.w3.org/2000/svg', OX=346, OY=10, K=1.75078125;
+const E=(tag,a={},parent)=>{const n=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(a))n.setAttribute(k,String(v));parent?.append(n);return n;};
+const P=(d,fill,parent,attr={})=>E('path',{d,fill,...attr},parent);
+const R=(x,y,w,h,fill,parent,attr={})=>E('rect',{x,y,width:w,height:h,fill,...attr},parent);
+const L=(d,c,w,parent,attr={})=>P(d,'none',parent,{stroke:c,'stroke-width':w,'stroke-linecap':'round','stroke-linejoin':'round',...attr});
+const T=(value,x,y,parent,klass,attr={})=>{const t=E('text',{x,y,class:klass,...attr},parent);t.textContent=value;return t;};
+const RNG=(seed)=>()=>{seed=(Math.imul(1664525,seed)+1013904223)>>>0;return seed/4294967296;};
+const COORD=p=>[(p.x-OX)/K,(p.y-OY)/K];
+const W='M192 -14 L219 -14 C231 43 227 106 226 139 C224 167 236 176 265 171 C293 167 315 176 341 201 C380 236 424 266 426 302 C431 329 412 343 380 349 C335 361 270 368 213 383 C185 390 174 407 166 440 L139 528 L104 528 L136 427 C147 389 159 369 197 358 C246 340 303 333 340 317 C360 307 362 296 346 281 C324 254 309 228 281 213 C260 200 245 199 225 200 C188 201 185 180 191 139 C197 96 202 44 187 -14 Z';
+const PARKS=[
+ 'M32 185 Q45 177 64 181 L155 214 L164 228 L123 227 L144 238 L82 253 L40 248 L27 218 Z',
+ 'M18 264 L102 253 L114 272 L92 291 L43 292 Z',
+ 'M208 223 L256 213 L254 247 L281 255 L284 266 L222 277 L204 264 Z',
+ 'M339 129 L399 100 L415 156 L340 179 Z',
+ 'M269 380 L297 374 L321 412 L325 424 L360 422 L365 484 L262 484 L265 432 L280 415 Z'
 ];
-const cityAreas=[
-'M0 110 L54 80 L210 110 L249 210 L206 276 L84 265 L0 315 Z',
-'M245 -35 L480 -35 L520 145 L427 209 L350 242 L280 204 Z',
-'M425 120 L690 51 L723 300 L610 363 L465 323 L383 258 Z',
-'M-15 362 L189 350 L276 440 L249 590 L192 718 L-15 718 Z',
-'M180 269 L396 237 L567 388 L489 519 L280 560 L123 460 Z',
-'M388 452 L721 376 L721 721 L340 721 Z'
+const ARTERIAL=[
+ 'M-20 102 L15 153 Q37 181 45 186 Q74 179 105 187 L175 201 L189 153 L305 99 L315 -20',
+ 'M-20 264 L85 263 L163 255 Q191 262 224 276 L238 282 L351 259 L423 239 L513 178',
+ 'M-20 373 L102 272 L126 252',
+ 'M304 -22 L322 55 L328 104 L330 168 L370 222 L425 255 L515 282',
+ 'M477 -20 L482 177 L423 239 L495 278',
+ 'M516 172 L458 207 L423 239',
+ 'M515 282 L480 352 L462 381 L463 428 L470 532',
+ 'M-20 264 L87 263 L111 257 L132 250 L176 254',
+ 'M-20 106 L11 151',
+ 'M-20 370 L100 278 L126 251'
 ];
-// Major street axes and river meanders follow the supplied reference image.
-const arterials=[
-'M-30 228 L22 230 Q47 266 78 298 L253 312 Q264 278 303 252 L427 154 L476 141 L493 -30',
-'M-30 379 L143 365 Q207 360 272 380 L345 393 L444 374 L542 351 L591 324 L711 254 L748 254',
-'M-28 557 L135 410 L160 373 L187 375',
-'M283 -30 L309 92 L305 205',
-'M423 -30 L463 130 L466 226 L509 293 L590 324 L694 380 L748 405',
-'M690 -30 L691 254 L625 344 L681 377 L625 505 L624 630 L644 749',
-'M-30 228 L15 232 L68 296 L74 350 L170 373',
-'M214 740 L244 668 L241 557 L256 498',
-'M341 741 L332 625 L338 546 L317 503',
-'M749 155 L692 153 L592 200 L490 230'
+const LOCAL=[
+ 'M19 20 L71 54 L120 68 L171 75', 'M40 -10 L73 60 L92 108 L104 169',
+ 'M58 49 L57 105 L77 126 L74 165', 'M86 73 L87 115 L103 129 L101 170',
+ 'M115 75 L115 115 L136 138 L134 182','M145 78 L144 106 L169 134',
+ 'M29 108 L63 109 L111 132 L177 139','M55 153 L111 151 L172 160',
+ 'M244 25 L303 6 L349 -16','M245 64 L286 43 L335 18 L432 8',
+ 'M254 94 L307 75 L360 51 L443 42','M265 131 L318 106 L376 82 L449 65',
+ 'M273 169 L316 149 L346 125 L425 96','M345 148 L406 116 L512 85',
+ 'M339 178 L416 153 L478 134 L515 124','M352 195 L421 172 L515 160',
+ 'M371 217 L424 198 L515 183','M429 255 L472 239 L515 216',
+ 'M358 20 L365 75 L375 115','M400 6 L414 62 L434 114','M441 11 L445 69 L456 136',
+ 'M284 49 L300 94 L319 135','M304 9 L332 62 L350 110',
+ 'M180 193 L178 224 L157 254','M191 195 L197 231 L179 266','M203 195 L216 236 L204 271',
+ 'M214 191 L234 225 L239 278','M225 189 L258 222 L264 277','M237 190 L281 226 L288 278',
+ 'M251 194 L307 226 L311 272','M264 197 L328 232 L335 262',
+ 'M177 220 L232 235 L292 244','M165 243 L217 258 L308 268',
+ 'M144 275 L208 294 L321 301','M131 297 L211 314 L345 314',
+ 'M115 321 L210 335 L326 339','M103 342 L189 355 L278 361',
+ 'M86 298 L123 353 L174 383','M100 286 L152 337 L189 378',
+ 'M124 268 L177 326 L213 373','M148 260 L191 315 L239 366',
+ 'M172 254 L218 314 L263 362','M208 258 L249 306 L290 351',
+ 'M243 280 L280 319 L314 346','M272 283 L304 310 L339 337',
+ 'M296 187 L339 198 L384 224','M308 212 L359 223 L406 247',
+ 'M330 239 L380 253','M304 257 L353 266','M294 285 L355 294',
+ 'M327 178 L316 239 L301 267','M348 195 L344 248 L325 280',
+ 'M365 205 L363 244 L346 277','M381 218 L391 251 L368 281',
+ 'M432 270 L472 284 L507 303','M425 288 L468 303 L497 318',
+ 'M427 310 L463 326 L495 338','M425 332 L457 350 L482 357',
+ 'M451 256 L438 290 L429 331','M474 275 L457 302 L448 339',
+ 'M-12 319 L40 327 L89 345','M-12 345 L44 357 L87 374',
+ 'M-9 385 L62 404 L119 410','M-8 411 L61 431 L106 432',
+ 'M4 441 L59 458 L90 451','M11 474 L52 483 L76 471',
+ 'M25 312 L18 362 L37 408','M50 326 L44 370 L63 417',
+ 'M78 335 L71 385 L82 427','M107 354 L95 393 L101 437',
+ 'M136 375 L116 412 L125 447','M155 386 L140 421 L153 450',
+ 'M239 367 L256 424 L251 513','M262 373 L280 432 L279 515',
+ 'M288 370 L309 410 L311 516','M316 366 L327 410 L341 515',
+ 'M210 409 L300 393 L394 374','M203 429 L309 410 L420 388',
+ 'M201 456 L302 436 L438 416',
+ 'M258 500 L335 484 L433 471 L490 449','M272 531 L353 515 L456 496',
+ 'M261 567 L361 551 L467 533','M260 612 L359 590 L468 571',
+ 'M272 650 L361 632 L479 609','M275 691 L375 676 L495 657',
+ 'M333 499 L335 696','M377 493 L378 697','M414 477 L416 699',
+ 'M434 401 L463 430','M483 410 L490 507','M425 481 L428 533',
+ 'M-20 500 L65 452 L109 421','M-20 447 L54 428 L84 406',
+ 'M516 70 L482 92 L453 110','M516 336 L470 349 L433 367'
 ];
-const local=[
-'M-15 66 L82 104 L215 111 L250 155','M-20 140 L68 169 L205 175 L265 204',
-'M20 55 L51 174 L65 264','M61 80 L80 127 L79 260','M92 106 L93 191 L111 265',
-'M122 110 L132 204 L151 267','M156 112 L163 211 L189 277',
-'M196 124 L197 208 L232 273','M2 266 L67 260 L163 300',
-'M120 155 L216 166','M130 209 L239 219',
-'M346 -22 L353 126 L385 205','M379 -25 L389 105 L425 177',
-'M413 -20 L414 98 L447 152','M455 14 L483 121','M496 9 L528 117 L584 187',
-'M332 63 L449 52 L550 12','M341 114 L470 105 L603 70 L720 47',
-'M352 172 L438 159 L590 113 L718 100',
-'M402 209 L468 191 L567 157 L719 122',
-'M480 238 L559 214 L721 180','M510 286 L620 252 L724 223',
-'M583 300 L720 310','M614 354 L729 349',
-'M-10 406 L139 408 L204 450 L264 500',
-'M-10 442 L114 442 L220 482','M-10 482 L98 477 L220 503',
-'M-10 519 L105 523 L226 548','M-10 570 L96 567 L214 590',
-'M-10 625 L98 615 L206 633','M-10 676 L104 657 L205 689',
-'M45 376 L26 498 L52 692','M81 370 L67 465 L82 704',
-'M120 397 L105 526 L127 708','M159 414 L141 549 L154 708',
-'M192 440 L176 557 L180 711',
-'M388 508 L491 484 L617 475 L735 447',
-'M378 542 L494 521 L615 515 L737 490',
-'M376 578 L515 564 L632 557 L735 534',
-'M377 617 L511 607 L625 598 L731 581',
-'M375 661 L519 657 L634 641 L731 623',
-'M382 703 L516 696 L639 686 L738 672',
-'M425 494 L420 735','M472 484 L471 737','M520 477 L520 739',
-'M563 467 L559 737','M608 462 L602 735','M669 439 L670 739',
-'M200 292 L257 313 L284 390 L264 439',
-'M218 309 L192 361 L215 429','M253 316 L227 371 L242 440',
-'M390 270 L447 320 L466 366','M411 257 L465 297 L499 351',
-'M443 246 L499 290 L548 334',
-'M394 412 L466 391 L513 381','M405 444 L487 413',
-'M-30 91 L61 21 L153 -35','M-27 596 L45 681 L102 738',
-'M96 740 L145 686 L187 648','M552 -30 L584 44 L646 97 L745 137',
-'M745 44 L671 65 L622 112'
-];
-const clusters=[
-{x:112,y:147,cols:5,rows:3,dx:31,dy:31,tilt:3},
-{x:179,y:255,cols:5,rows:3,dx:15,dy:18,tilt:18},
-{x:232,y:302,cols:5,rows:8,dx:18,dy:18,tilt:20},
-{x:295,y:273,cols:5,rows:5,dx:18,dy:15,tilt:-5},
-{x:380,y:293,cols:5,rows:4,dx:18,dy:16,tilt:-32},
-{x:399,y:375,cols:7,rows:4,dx:18,dy:16,tilt:-11},
-{x:125,y:411,cols:8,rows:5,dx:17,dy:15,tilt:26},
-{x:322,y:528,cols:3,rows:9,dx:21,dy:17,tilt:3},
-{x:465,y:90,cols:5,rows:4,dx:21,dy:19,tilt:-22},
-{x:513,y:229,cols:6,rows:4,dx:20,dy:20,tilt:-22},
-{x:585,y:350,cols:5,rows:5,dx:18,dy:19,tilt:16},
-{x:441,y:489,cols:7,rows:5,dx:19,dy:20,tilt:3},
-{x:554,y:517,cols:6,rows:5,dx:19,dy:19,tilt:3},
-{x:390,y:645,cols:7,rows:4,dx:18,dy:17,tilt:2}
-];
-const centerline=[[270,-40],[285,80],[279,185],[280,242],[340,270],[394,272],[458,319],[521,371],[563,404],[557,433],[500,456],[410,469],[318,479],[256,498],[236,570],[205,740]];
-const waterDist=(x,y)=>{let best=Infinity;for(let i=1;i<centerline.length;i++){const [ax,ay]=centerline[i-1],[bx,by]=centerline[i],dx=bx-ax,dy=by-ay,t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy||1)));best=Math.min(best,Math.hypot(x-ax-dx*t,y-ay-dy*t));}return best;};
-const parks=[{x:123,y:327,rx:84,ry:47},{x:339,y:350,rx:49,ry:35},{x:531,y:199,rx:63,ry:43},{x:436,y:598,rx:62,ry:66}];
-const cityLot=(x,y)=>x>83&&x<600&&y>95&&y<667;
-const isPark=(x,y)=>parks.some(p=>Math.abs(x-p.x)<p.rx&&Math.abs(y-p.y)<p.ry);
-function tree(x,y,parent,r=3){svg('circle',{cx:x,cy:y,r:r+1.4,fill:'#a2cb91',opacity:.7},parent);svg('circle',{cx:x-1,cy:y-1,r,fill:'#73aa70'},parent);}
-function facility(p,g){const x=(p.x-X0)/S,y=(p.y-Y0)/S,type=p.type;
-  const tint={school:'#eaf0f6',market:'#fcf0e1',hospital:'#fceaea',civic:'#e6eff5',office:'#edecfa',park:'#a6d88c'}[type];
-  if(type==='park'){path(`M${x-16} ${y-13}l32 -2 5 26 -38 2Z`,'#a6d88c',g);for(const [dx,dy] of [[-10,-5],[10,-8],[-11,8],[9,7]])tree(x+dx,y+dy,g,2.3);line(`M${x-16} ${y+12}L${x+16} ${y-12}`,'#f8faed',2,g);return;}
-  rect(x-18,y-15,36,30,tint,g,{rx:1.5,stroke:'#d2d7d2','stroke-width':.65});
-  if(type==='school'){rect(x-15,y-12,21,13,'#879eaf',g);rect(x-15,y+3,21,8,'#a8bbc6',g);rect(x+8,y-12,7,23,'#91c5a1',g);line(`M${x+10} ${y-8}h4 M${x+10} ${y-2}h4 M${x+10} ${y+4}h4`,'#f9faf8',.65,g);}
-  else if(type==='market'){rect(x-15,y-10,30,16,'#aeb5bb',g);rect(x-15,y-10,30,4,'#d28c54',g);for(const dx of [-11,-4,3,10])rect(x+dx,y-1,5,4,'#e9edf0',g);rect(x-13,y+8,26,3,'#e2d8c6',g);}
-  else if(type==='hospital'){rect(x-12,y-12,24,24,'#c1cdd4',g);rect(x-4,y-8,8,16,'#fff',g);rect(x-8,y-4,16,8,'#fff',g);line(`M${x} ${y-7}v14 M${x-7} ${y}h14`,'#d65360',2,g);}
-  else if(type==='civic'){rect(x-13,y-9,26,17,'#a6b8c9',g);path(`M${x-16} ${y-10}l16 -7 16 7Z`,'#8198b1',g);for(const dx of [-8,0,8])rect(x+dx-1.5,y-6,3,11,'#edf3f4',g);line(`M${x-15} ${y+10}h30`,'#a0b1bf',2,g);}
-  else{rect(x-15,y-12,11,25,'#a8b4c5',g);rect(x-1,y-15,16,28,'#98a5bc',g);for(const dx of [-12,-8,-4,2,7,12])for(const dy of [-8,-2,4])rect(x+dx,y+dy,2.2,2.2,'#e7eff2',g);}
+function pointLineDistance(x,y,points){let best=1e6;for(let i=1;i<points.length;i++){let [ax,ay]=points[i-1],[bx,by]=points[i],dx=bx-ax,dy=by-ay,t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy||1)));best=Math.min(best,Math.hypot(x-ax-dx*t,y-ay-dy*t));}return best;}
+const riverAxis=[[205,-10],[212,80],[205,148],[221,183],[260,190],[290,202],[333,240],[376,280],[400,310],[380,329],[301,349],[219,372],[167,395],[154,439],[118,519]];
+const insidePark=(x,y)=>[[94,219,65,28],[66,276,48,18],[242,245,43,29],[377,142,45,42],[309,436,58,60]].some(([a,b,w,h])=>Math.abs(x-a)<w&&Math.abs(y-b)<h);
+const noBuilding=(x,y)=>pointLineDistance(x,y,riverAxis)<29||insidePark(x,y)||places.some(p=>{const[a,b]=COORD(p);return Math.hypot(a-x,b-y)<16;});
+function facility(p,g){const[x,y]=COORD(p),c={school:'#e4edf2',market:'#f9eee1',hospital:'#f9e9ea',civic:'#e9eef3',office:'#e9e7f0',park:'#a7d66d'}[p.type];if(p.type==='park')return;
+ R(x-13,y-12,26,24,c,g,{rx:.5,stroke:'#c8cbcf','stroke-width':.7});
+ if(p.type==='school'){R(x-11,y-10,15,14,'#95a7b2',g);R(x+6,y-10,5,20,'#92bf8d',g);R(x-11,y+6,15,4,'#c4d4d9',g);}
+ else if(p.type==='market'){R(x-11,y-8,22,13,'#bfc4c8',g);R(x-11,y-8,22,3,'#d59d54',g);for(let k=0;k<3;k++)R(x-8+k*7,y,5,3,'#e5eff2',g);}
+ else if(p.type==='hospital'){R(x-10,y-10,20,20,'#b9c4cc',g);R(x-2,y-7,4,14,'#fff',g);R(x-7,y-2,14,4,'#fff',g);L(`M${x-4} ${y}h8 M${x} ${y-4}v8`,'#cd5760',1.6,g);}
+ else if(p.type==='civic'){R(x-11,y-6,22,15,'#9caec0',g);P(`M${x-13} ${y-7}l13 -6 13 6Z`,'#889cae',g);for(let k=-1;k<=1;k++)R(x+k*6-1,y-4,2,11,'#f4f7f8',g);}
+ else{R(x-10,y-9,9,19,'#a1aab8',g);R(x+1,y-12,9,22,'#9ba6bb',g);}
 }
+function major(d,g){L(d,'#e9a43d',4.6,g);L(d,'#ffd06b',3.15,g);}
+function shortStreet(d,g){L(d,'#ffffff',1.65,g);}
 export function finishLandscape(root){
-  root.replaceChildren();
-  rect(-360,-180,2320,1320,'#dbeacb',root);
-  const rural=svg('g',{'aria-hidden':true},root),r=rand(60178);
-  // Only the outer countryside is decorative; the mapped city preserves source proportions.
-  for(let i=0;i<44;i++){const x=-300+(i%9)*242+(r()-.5)*45,y=-160+Math.floor(i/9)*240+(r()-.5)*36,w=132+r()*110,h=92+r()*130;rect(x,y,w,h,['#e1edcc','#d6e6ba','#e9ebcc','#cae0b9'][i%4],rural,{opacity:.52,rx:8});}
-  for(let i=0;i<135;i++){const x=-330+r()*2250,y=-155+r()*1220;if(x>X0-45&&x<X0+S*765&&y>-40&&y<940)continue;tree(x,y,rural,1.6+r()*2.3);}
-  const map=svg('g',{transform:`translate(${X0} ${Y0}) scale(${S})`},root);
-  rect(-10,-35,740,775,'#dcebcf',map);
-  for(const d of cityAreas)path(d,'#f1f2ee',map,{stroke:'#e1e6e0','stroke-width':.6});
-  for(const d of parkShapes)path(d,'#acdc80',map,{stroke:'#a9d18d','stroke-width':1});
-  const parkWalks=svg('g',{'aria-hidden':true},map);
-  for(const d of ['M64 291L191 331','M84 349L188 294','M302 367L335 319','M307 337L370 373','M400 641L472 546','M398 559L475 622','M487 207L574 171'])line(d,'#e7f5d0',1.5,parkWalks);
-  for(let i=0;i<200;i++){const x=r()*720,y=r()*700;if(isPark(x,y)&&r()<.85)tree(x,y,parkWalks,1+r()*2.2);}
-  const minor=svg('g',{'aria-hidden':true},map);
-  for(const d of local)road(d,minor);
-  const fan=svg('g',{'aria-hidden':true},map);
-  for(let i=0;i<12;i++){
-    const a=(i-7)*.145,x1=297+Math.sin(a)*29,y1=321+Math.cos(a)*17,x2=300+Math.sin(a)*210;
-    let y2=321+Math.cos(a)*160;if(y2>478)y2=478;
-    road(`M${x1.toFixed(1)} ${y1.toFixed(1)}Q${(x1+x2)/2} ${(y1+y2)/2+13} ${x2.toFixed(1)} ${y2.toFixed(1)}`,fan);
-  }
-  for(const d of ['M188 349Q294 381 401 351','M167 383Q293 419 466 396','M138 415Q299 465 481 435','M165 447Q300 496 451 465'])road(d,fan);
-  const footprints=svg('g',{'aria-hidden':true},map),lotR=rand(8791),occupied=[];
-  for(const c of clusters)for(let row=0;row<c.rows;row++)for(let col=0;col<c.cols;col++){
-    if(lotR()<.17)continue;
-    const x=c.x+col*c.dx+(lotR()-.5)*4,y=c.y+row*c.dy+(lotR()-.5)*4;
-    if(waterDist(x,y)<36||isPark(x,y)||!cityLot(x,y))continue;
-    if(places.some(p=>Math.hypot((p.x-X0)/S-x,(p.y-Y0)/S-y)<22))continue;
-    const w=7+lotR()*7,h=6+lotR()*8;
-    rect(x-w/2,y-h/2,w,h,lotR()<.21?'#d6dce0':'#bbc6cc',footprints,{rx:.6,transform:`rotate(${c.tilt} ${x} ${y})`,stroke:'#b1bcc2','stroke-width':.55});
-    occupied.push([x,y]);
-  }
-  const sites=svg('g',{'aria-hidden':true},map);
-  for(const p of places)facility(p,sites);
-  const highways=svg('g',{'aria-hidden':true},map);
-  for(const d of arterials)road(d,highways,'arterial');
-  // An opaque channel masks conventional roads; only named crossings overlay the water.
-  const bank=svg('g',{'aria-hidden':true},map);
-  line(riverEdgeLeft,'#9dd09b',12,bank);line(riverEdgeRight,'#9dd09b',12,bank);
-  path(waterShape,'#70c3eb',bank,{stroke:'#9bd5dc','stroke-width':1});
-  line(riverEdgeLeft,'#8dd19d',4,bank);line(riverEdgeRight,'#8dd19d',4,bank);
-  const bridgePaths={'ponte-norte':'M268 266 L341 218','ponte-central':'M478 365 L563 337','ponte-sul':'M204 486 L260 522'};
-  const crossings=svg('g',{id:'bridge-layer'},map);
-  for(const b of bridges){const d=bridgePaths[b.id],g=svg('g',{class:'bridge-hit','data-bridge':b.id,role:'button',tabindex:0,'aria-label':`Inspecionar ${b.name}`},crossings);if(!d)continue;
-    line(d,'#d1b46e',10,g);line(d,'#ffd16c',7,g,{class:'bridge-deck'});
-    const bx=(b.x-X0)/S,by=(b.y-Y0)/S;svg('circle',{cx:bx,cy:by,r:15,fill:'transparent'},g);
-    text(b.name,bx+16,by-10,g,'bridge-label',{'font-size':8,'paint-order':'stroke','stroke':'white','stroke-width':2.5});
-  }
-  const homes=svg('g',{id:'homes-layer'},map);let homeCount=0;
-  for(const [x,y] of occupied){if(homeCount>=230)break;if(lotR()<.3)continue;
-    let nearest=1e9;for(const p of places)nearest=Math.min(nearest,Math.hypot(x-(p.x-X0)/S,y-(p.y-Y0)/S));if(nearest<24)continue;
-    homeCount++;
-    const region=y<310?(x<340?'norte-verde':x<520?'jardim-do-rio':'vale-do-sol'):(x<230?'vila-industrial':x<390?'centro-civico':x<540?'parque-leste':'colinas-do-sul');
-    const g=svg('g',{class:'home-node','data-home':`casa-${String(homeCount).padStart(3,'0')}`,'data-region':region,role:'button',tabindex:0,'aria-label':`Inspecionar residência ${homeCount}`},homes);
-    svg('circle',{cx:x,cy:y,r:3.3,fill:'#418b65',stroke:'#fff','stroke-width':1.1},g);
-    svg('circle',{cx:x,cy:y,r:8,fill:'transparent'},g);
-  }
-  const flows=svg('g',{id:'flows-layer',class:'map-layer-hidden'},map);
-  for(const b of bridges){const d=bridgePaths[b.id];if(d)line(d,'#377ed0',2.2,flows,{class:'flow','data-flow-bridge':b.id});}
-  const names=svg('g',{'aria-hidden':true},map);
-  for(const d of districts){const x=(d.x-X0)/S,y=(d.y-Y0)/S;text(d.name,x,y,names,'district-label',{'text-anchor':'middle','font-size':10,'stroke-width':2.5});}
-  text('RIO CENTRAL',442,421,names,'river-label',{'font-size':11,'letter-spacing':3,'text-anchor':'middle',transform:'rotate(-13 442 421)'});
-  const hubs=svg('g',{id:'places-layer'},map);
-  for(const p of places){const x=(p.x-X0)/S,y=(p.y-Y0)/S;
-    const g=svg('g',{class:'map-place','data-place':p.id,role:'button',tabindex:0,'aria-label':`Inspecionar ${p.name}`},hubs);
-    rect(x-20,y-19,40,40,'transparent',g,{rx:2});
-    svg('circle',{cx:x,cy:y-4,r:9,fill:placeColors[p.type],stroke:'#fff','stroke-width':2,class:'place-bubble'},g);
-    text(placeGlyphs[p.type],x,y-.7,g,'',{'text-anchor':'middle',fill:'white','font-size':9,'font-weight':800});
-    text({school:'Escola',market:'Mercado',hospital:'Hospital',civic:'Prefeitura',office:'Empresa',park:'Praça'}[p.type],x,y+18,g,'place-label',{'text-anchor':'middle','font-size':8});
-  }
-  return {homeCount};
+ root.replaceChildren();R(-340,-180,2300,1300,'#dce8d3',root);
+ const fields=E('g',{'aria-hidden':'true'},root),outer=RNG(91);
+ for(let i=0;i<27;i++){let x=-300+(i%7)*320+(outer()-.5)*24,y=-170+Math.floor(i/7)*295+(outer()-.5)*22;R(x,y,150+outer()*120,125+outer()*90,['#dae7c6','#d7e6ba','#e4ebcf'][i%3],fields,{opacity:.55});}
+ const map=E('g',{transform:`translate(${OX} ${OY}) scale(${K})`},root);
+ R(-8,-8,528,528,'#edeef0',map);
+ for(const shape of PARKS)P(shape,'#93c623',map);
+ const streets=E('g',{'aria-hidden':'true'},map);for(const d of LOCAL)shortStreet(d,streets);
+ const roofs=E('g',{'aria-hidden':'true'},map),rr=RNG(190211),occupied=[];
+ const groups=[
+ [80,80,4,3,23,17,0],[134,135,3,2,18,16,0],
+ [275,55,5,3,14,15,-20],[310,100,4,3,17,15,-21],
+ [352,172,3,2,17,17,-21],[385,196,4,3,16,15,-20],
+ [144,210,6,5,11,12,12],[179,205,5,6,12,12,0],
+ [201,260,7,5,11,11,0],[130,281,7,5,11,11,30],
+ [83,316,6,5,11,12,32],[197,305,9,4,11,11,0],
+ [235,189,5,4,11,10,-3],[274,199,5,5,11,11,-28],
+ [312,219,4,5,11,11,-30],[337,248,4,4,11,11,-25],
+ [367,262,5,5,11,11,-20],[396,283,4,5,11,11,16],
+ [240,401,4,7,13,14,0],[281,404,3,6,17,18,0],
+ [289,483,4,2,17,16,0],[334,389,3,4,16,17,0],
+ [391,392,4,3,19,16,0],[383,449,4,3,17,17,0],
+ [444,255,4,4,14,14,15]
+ ];
+ for(const [ox,oy,nx,ny,dx,dy,rot] of groups)for(let row=0;row<ny;row++)for(let col=0;col<nx;col++){
+  if(rr()<.12)continue;const x=ox+col*dx+(rr()-.5)*2,y=oy+row*dy+(rr()-.5)*2;
+  if(x<5||x>501||y<6||y>499||noBuilding(x,y))continue;
+  let w=(dx*.55)+(rr()-.5)*2,h=(dy*.52)+(rr()-.5)*2;
+  R(x-w/2,y-h/2,w,h,rr()<.15?'#d2d5d9':'#bfc2c6',roofs,{transform:`rotate(${rot} ${x} ${y})`,stroke:'#bfc2c6','stroke-width':.35});
+  occupied.push([x,y]);
+ }
+ for(const [x,y,w,h] of [[296,379,15,31],[319,382,17,44],[344,380,16,37],[361,382,21,47],[279,470,18,24],[302,470,19,23],[327,471,19,23],[421,400,17,28],[441,402,18,31]]){
+  if(noBuilding(x+w/2,y+h/2))continue;R(x,y,w,h,'#bcbfc3',roofs);
+ }
+ const facilities=E('g',{'aria-hidden':'true'},map);for(const p of places)facility(p,facilities);
+ const arterials=E('g',{'aria-hidden':'true'},map);for(const d of ARTERIAL)major(d,arterials);
+ P('M179 -10L190 -10C207 52 194 104 187 154C183 184 188 201 207 208L201 213C170 194 178 162 185 124C192 78 191 39 179 -10Z','#f4ec65',map);
+ P('M124 413C132 383 143 366 162 359L174 359C149 380 140 394 132 436L109 518L94 518Z','#f4ed6b',map);
+ const hydro=E('g',{'aria-hidden':'true'},map);P(W,'#6bc5e7',hydro);
+ const crossing=E('g',{id:'bridge-layer'},map);
+ const bridgeLines={'ponte-norte':'M177 188 L271 122','ponte-central':'M349 267 L429 239','ponte-sul':'M130 345 L211 384'};
+ for(const b of bridges){const d=bridgeLines[b.id],g=E('g',{class:'bridge-hit','data-bridge':b.id,role:'button',tabindex:0,'aria-label':`Inspecionar ${b.name}`},crossing);
+  L(d,'#dea648',7.4,g);L(d,'#ffd06b',5,g,{class:'bridge-deck'});
+  const [x,y]=COORD(b);E('circle',{cx:x,cy:y,r:12,fill:'transparent'},g);T(b.name,x+12,y-8,g,'bridge-label',{'font-size':7,'paint-order':'stroke',stroke:'#fff','stroke-width':2});
+ }
+ const homes=E('g',{id:'homes-layer'},map);let count=0;
+ for(const [x,y] of occupied){if(count>=230)break;if(rr()<.36)continue;count++;const region=y<210?(x<250?'norte-verde':x<370?'jardim-do-rio':'vale-do-sol'):(x<175?'colinas-do-sul':x<300?'centro-civico':x<390?'vila-industrial':'parque-leste');
+  const g=E('g',{'data-home':`casa-${String(count).padStart(3,'0')}`,'data-region':region,class:'home-node',role:'button',tabindex:0,'aria-label':`Inspecionar residência ${count}`},homes);
+  E('circle',{cx:x,cy:y,r:1.6,fill:'#438968',stroke:'#fff','stroke-width':.65},g);E('circle',{cx:x,cy:y,r:5,fill:'transparent'},g);
+ }
+ const flows=E('g',{id:'flows-layer',class:'map-layer-hidden'},map);for(const b of bridges){L(bridgeLines[b.id],'#377ec7',1.7,flows,{class:'flow','data-flow-bridge':b.id});}
+ const names=E('g',{'aria-hidden':'true'},map);for(const d of districts){const[x,y]=COORD(d);T(d.name,x,y,names,'district-label',{'text-anchor':'middle','font-size':7,'stroke-width':1.5,opacity:.83});}
+ const poi=E('g',{id:'places-layer'},map);
+ for(const p of places){const[x,y]=COORD(p),g=E('g',{'data-place':p.id,class:'map-place',role:'button',tabindex:0,'aria-label':`Inspecionar ${p.name}`},poi);
+  R(x-12,y-12,24,24,'transparent',g);E('circle',{cx:x,cy:y-2,r:6.5,fill:placeColors[p.type],stroke:'#fff','stroke-width':1.3,class:'place-bubble'},g);T(placeGlyphs[p.type],x,y+.6,g,'',{'text-anchor':'middle','font-size':6,fill:'#fff','font-weight':800});
+  T({school:'Escola',market:'Mercado',hospital:'Hospital',civic:'Prefeitura',office:'Empresa',park:'Parque'}[p.type],x,y+12,g,'place-label',{'text-anchor':'middle','font-size':6,'stroke-width':1.5});
+ }
+ return {homeCount:count};
 }
