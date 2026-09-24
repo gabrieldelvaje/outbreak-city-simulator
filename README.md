@@ -1,22 +1,28 @@
 # OUTBREAK — City Network Simulator
 
-Simulador experimental de transmissão em uma cidade **inteiramente fictícia**. O mapa 2D, a rede de mobilidade e o motor epidemiológico serão desenvolvidos em etapas para publicação estática via GitHub Pages.
+Simulador experimental de transmissão em uma cidade **inteiramente fictícia**, com mapa vetorial 2D e um motor de infecção baseado em agentes sintéticos, documentado e versionado separadamente.
 
-## Primeira entrega
+## Mapa interativo (GitHub Pages)
 
-- Cidade 2D autoral inspirada na clareza visual de aplicativos de mapas, sem usar tiles proprietários.
-- Rio e três pontes como gargalos de mobilidade; bairros, residências e locais públicos identificáveis.
-- Zoom, seleção de locais e camadas de visualização; preparação para nós/grafos expansíveis.
+- Cidade 2D baseada na referência vetorial do projeto, com rio, três pontes, bairros, residências e locais públicos.
+- Zoom, seleção de locais, grafos ilustrativos e controles visuais de pontes.
+- Página: https://gabrieldelvaje.github.io/outbreak-city-simulator/
 
-## Próximas etapas
+## Motor matemático de infecção — implementação v1
 
-1. Integrar o motor estocástico já prototipado à topologia espacial do mapa.
-2. Conectar casas, escolas, empresas, mercados, praças e hospitais a uma agenda de agentes sintéticos.
-3. Implementar fechamento de locais, home office, intervenções nas pontes e vacinação com parâmetros explicitamente hipotéticos/documentados.
-4. Adicionar indicadores e análises de múltiplas simulações, preservando separação entre observações históricas e dados simulados.
+O **código executável já está no repositório**: [simulator/README.md](simulator/README.md), [simulator/engine.mjs](simulator/engine.mjs), [parâmetros hipotéticos](simulator/data/hypothetical_profiles.json), [metodologia e fontes](simulator/docs/MODELO_E_METODOLOGIA.md), [testes](simulator/tests/test_engine.mjs) e [linhagem dos dados históricos](simulator/data/historical_provenance.json). É um modelo estocástico individual com estados S/E/I/H/R/D, rede de contatos por tipo de local, atenção hospitalar, detecção, vacinação e intervenções configuráveis.
 
-**Limite científico:** esta aplicação é educacional e exploratória, não faz previsões médicas nem atribui efeitos causais a intervenções históricas.
+Para executar a partir da raiz do projeto (Node 20+):
+
+```bash
+node simulator/tests/test_engine.mjs
+node simulator/examples/run_example.mjs
+```
+
+**Estado da integração:** o motor já pode produzir séries e eventos sintéticos **isoladamente**, mas ainda não está conectado às pessoas e construções do SVG nem aos botões do mapa. Em especial, a v1 calcula bloqueio genérico de travessias entre margens; abrir ou bloquear uma das três pontes na interface **ainda não recalcula o surto**. Essa conexão do grafo viário real, o relógio Play/Pause/Step e a projeção dos resultados no mapa são os próximos trabalhos.
+
+**Limite científico:** as bases históricas da OMS e OxCGRT são referências observacionais distintas dos parâmetros demonstrativos da cidade. β por contato, incubação, períodos, riscos por idade, eficácia da vacina e impactos de medidas do simulador **não foram calibrados** com os arquivos enviados. Não utilizar o modelo para previsão médica ou efeitos causais no mundo real.
 
 ## Publicação
 
-Configurar em **Settings → Pages → Build and deployment → Deploy from a branch → main / (root)**. A entrada do site será `index.html`. Após a publicação: https://gabrieldelvaje.github.io/outbreak-city-simulator/
+GitHub Pages está configurado para publicar a raiz da branch `main`, usando `index.html`. O diretório `simulator/` funciona independentemente como módulo ES JavaScript no navegador ou Node, sem backend.
