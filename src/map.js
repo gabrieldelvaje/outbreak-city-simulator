@@ -7,37 +7,55 @@ const world=$('map-world');
 drawCity(world);
 finishLandscape(world);
 const bridgeState=Object.fromEntries(bridges.map(b=>[b.id,true]));
-// Keep the desktop view unchanged. On mobile, use a closer maximum zoom-out
-// in both themes so the city fills more of the available map area.
+// The desktop keeps its original framing. On narrow screens the reference city
+// fills the available width, and the SVG viewBox follows the portrait viewport
+// instead of letterboxing a fixed 16:9 view into a tall mobile map area.
 const bounds={left:-30,top:-2,right:1630,bottom:932};
 const DESKTOP_MAX_WIDTH=1660;
-const MOBILE_MAX_WIDTH=1280;
+const MOBILE_MAX_WIDTH=960;
 const mobileLayout=window.matchMedia('(max-width: 780px)');
 const maxWidth=()=>mobileLayout.matches?MOBILE_MAX_WIDTH:DESKTOP_MAX_WIDTH;
+const viewHeight=w=>{
+ if(!mobileLayout.matches)return w*HEIGHT/WIDTH;
+ const rect=svg.getBoundingClientRect();
+ return rect.width>0&&rect.height>0?w*rect.height/rect.width:w*HEIGHT/WIDTH;
+};
 const fullView=()=>{
- const w=maxWidth(),h=w*HEIGHT/WIDTH;
- return {x:bounds.left+(DESKTOP_MAX_WIDTH-w)/2,y:bounds.top+(bounds.bottom-bounds.top-h)/2,w,h};
+ const w=maxWidth(),h=viewHeight(w);
+ return {x:(bounds.left+bounds.right-w)/2,y:(bounds.top+bounds.bottom-h)/2,w,h};
 };
 let view=fullView(),drag=null;
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 function updateView(){svg.setAttribute('viewBox',`${view.x} ${view.y} ${view.w} ${view.h}`);}
-function constrain(){view.x=clamp(view.x,bounds.left,bounds.right-view.w);view.y=clamp(view.y,bounds.top,bounds.bottom-view.h);}
+function constrain(){
+ const centerX=(bounds.left+bounds.right)/2,centerY=(bounds.top+bounds.bottom)/2;
+ view.x=view.w>=bounds.right-bounds.left?centerX-view.w/2:clamp(view.x,bounds.left,bounds.right-view.w);
+ view.y=view.h>=bounds.bottom-bounds.top?centerY-view.h/2:clamp(view.y,bounds.top,bounds.bottom-view.h);
+}
 function zoom(factor,centerX=view.x+view.w/2,centerY=view.y+view.h/2){
- const w=clamp(view.w*factor,240,maxWidth()),h=w*HEIGHT/WIDTH;
+ const w=clamp(view.w*factor,240,maxWidth()),h=viewHeight(w);
  const fx=(centerX-view.x)/view.w,fy=(centerY-view.y)/view.h;
  view={x:centerX-fx*w,y:centerY-fy*h,w,h};constrain();updateView();
 }
-const reset=()=>{view=fullView();updateView();};
+const reset=()=>{view=fullView();constrain();updateView();};
 $('reset-view').onclick=reset;$('zoom-reset').onclick=reset;
 $('zoom-in').onclick=()=>zoom(.78);$('zoom-out').onclick=()=>zoom(1.28);
-updateView();
-// Reframe only when crossing the mobile/desktop breakpoint, not on every
-// browser-chrome resize or device rotation that stays in the same layout.
+reset();
+// Restore the intended scale when switching between desktop and mobile.
 mobileLayout.addEventListener('change',reset);
-// The rendered SVG may letterbox on narrow screens. Convert gestures using
-// the displayed SVG region rather than the surrounding map container.
+// Browser chrome can resize the portrait map without crossing a breakpoint.
+// Keep its current zoom and center while adapting the viewBox aspect ratio.
+window.addEventListener('resize',()=>{
+ if(!mobileLayout.matches)return;
+ const h=viewHeight(view.w);
+ if(Math.abs(h-view.h)<.5)return;
+ const cy=view.y+view.h/2;
+ view.y=cy-h/2;view.h=h;constrain();updateView();
+});
+// Use the actual viewBox ratio for pointer/wheel geometry; the mobile SVG now
+// fills its container, while the desktop may still have letterboxing.
 function screenRect(){
- const r=svg.getBoundingClientRect(),ratio=WIDTH/HEIGHT;
+ const r=svg.getBoundingClientRect(),ratio=view.w/view.h;
  let left=r.left,top=r.top,width=r.width,height=r.height;
  if(width/height>ratio){width=height*ratio;left+=(r.width-width)/2;}
  else{height=width/ratio;top+=(r.height-height)/2;}
