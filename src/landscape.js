@@ -1,213 +1,187 @@
-import {WIDTH,HEIGHT,riverY,bridges,districts,places,placeColors,placeGlyphs} from './city-data.js';
-
-// Fictional cartography. All geometry lives in one shared map coordinate system.
-// Decorative suburbs and fields contain no epidemic agents.
-const NS='http://www.w3.org/2000/svg';
-const S=(tag,a={},parent)=>{const n=document.createElementNS(NS,tag);for(const [key,val] of Object.entries(a))n.setAttribute(key,String(val));parent?.append(n);return n;};
-const P=(d,fill,parent,a={})=>S('path',{d,fill,...a},parent);
-const L=(d,stroke,width,parent,a={})=>P(d,'none',parent,{stroke,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',...a});
-const R=(x,y,width,height,fill,parent,a={})=>S('rect',{x,y,width,height,fill,...a},parent);
-const C=(cx,cy,r,fill,parent,a={})=>S('circle',{cx,cy,r,fill,...a},parent);
-const T=(content,x,y,parent,klass,a={})=>{const n=S('text',{x,y,class:klass,...a},parent);n.textContent=content;return n;};
-const rng=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-const poly=pts=>'M'+pts.map(([x,y])=>`${x.toFixed(1)} ${y.toFixed(1)}`).join('L')+'Z';
-const riverPts=(offset,a=-275,b=1875)=>{const out=[];for(let x=a;x<=b;x+=7)out.push([x,riverY(x)+offset]);out.push([b,riverY(b)+offset]);return out;};
-const band=(a,b)=>poly([...riverPts(a),...riverPts(b).reverse()]);
-const label=(text,x,y,parent,klass,a={})=>T(text,x,y,parent,klass,{'text-anchor':'middle',...a});
-
+import {places,bridges,districts,placeColors,placeGlyphs} from './city-data.js';
+// Vector tracing of the layout in the user's reference photo, not a replacement invented city.
+// Source illustration is square; preserved proportions inside the 1600x900 site viewport.
+const NS='http://www.w3.org/2000/svg',X0=346,Y0=10,S=1.245;
+const svg=(tag,attrs={},parent)=>{const e=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));parent?.append(e);return e;};
+const path=(d,fill,parent,attrs={})=>svg('path',{d,fill,...attrs},parent);
+const rect=(x,y,w,h,fill,parent,attrs={})=>svg('rect',{x,y,width:w,height:h,fill,...attrs},parent);
+const line=(d,color,width,parent,attrs={})=>path(d,'none',parent,{stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',...attrs});
+const text=(s,x,y,parent,cls,attrs={})=>{const t=svg('text',{x,y,class:cls,...attrs},parent);t.textContent=s;return t;};
+const rand=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+const road=(d,parent,kind='local')=>{const w=kind==='trunk'?6:kind==='arterial'?4.7:2.1;
+  line(d,kind==='trunk'?'#e4ae49':kind==='arterial'?'#edbd63':'#d9dfde',w+2.2,parent);
+  line(d,kind==='trunk'?'#ffca60':kind==='arterial'?'#ffcf79':'#fff',w,parent);
+};
+const waterShape=`M277 -36 C286 47 279 137 270 186 C265 223 272 250 307 259 C336 272 364 261 388 267 C438 283 482 345 544 363 C585 376 609 407 589 434 C571 463 511 467 462 479 C385 488 323 483 285 504 C258 520 260 602 230 735 L185 735 C212 646 214 537 242 494 C262 470 319 462 401 454 C486 443 530 426 531 405 C530 384 462 335 416 298 C388 280 358 278 316 277 C268 273 248 243 258 185 C268 113 265 39 247 -36 Z`;
+const riverEdgeLeft='M277 -36 C286 47 279 137 270 186 C265 223 272 250 307 259 C336 272 364 261 388 267 C438 283 482 345 544 363 C585 376 609 407 589 434 C571 463 511 467 462 479 C385 488 323 483 285 504 C258 520 260 602 230 735';
+const riverEdgeRight='M247 -36 C265 39 268 113 258 185 C248 243 268 273 316 277 C358 278 388 280 416 298 C462 335 530 384 531 405 C530 426 486 443 401 454 C319 462 262 470 242 494 C214 537 212 646 185 735';
+const parkShapes=[
+'M55 267 Q79 265 105 278 L221 302 L187 329 L145 332 L158 348 L110 379 L78 371 L62 344 Z',
+'M290 323 L336 308 L329 350 L378 361 L389 381 L322 381 L285 368 Z',
+'M471 192 L567 157 L590 203 L490 246 Z',
+'M391 534 L428 523 L451 574 L478 584 L493 650 L382 665 L378 602 Z',
+'M13 605 L74 625 L90 682 L0 680 Z'
+];
+const cityAreas=[
+'M0 110 L54 80 L210 110 L249 210 L206 276 L84 265 L0 315 Z',
+'M245 -35 L480 -35 L520 145 L427 209 L350 242 L280 204 Z',
+'M425 120 L690 51 L723 300 L610 363 L465 323 L383 258 Z',
+'M-15 362 L189 350 L276 440 L249 590 L192 718 L-15 718 Z',
+'M180 269 L396 237 L567 388 L489 519 L280 560 L123 460 Z',
+'M388 452 L721 376 L721 721 L340 721 Z'
+];
+// Major street axes and river meanders follow the supplied reference image.
+const arterials=[
+'M-30 228 L22 230 Q47 266 78 298 L253 312 Q264 278 303 252 L427 154 L476 141 L493 -30',
+'M-30 379 L143 365 Q207 360 272 380 L345 393 L444 374 L542 351 L591 324 L711 254 L748 254',
+'M-28 557 L135 410 L160 373 L187 375',
+'M283 -30 L309 92 L305 205',
+'M423 -30 L463 130 L466 226 L509 293 L590 324 L694 380 L748 405',
+'M690 -30 L691 254 L625 344 L681 377 L625 505 L624 630 L644 749',
+'M-30 228 L15 232 L68 296 L74 350 L170 373',
+'M214 740 L244 668 L241 557 L256 498',
+'M341 741 L332 625 L338 546 L317 503',
+'M749 155 L692 153 L592 200 L490 230'
+];
+const local=[
+'M-15 66 L82 104 L215 111 L250 155','M-20 140 L68 169 L205 175 L265 204',
+'M20 55 L51 174 L65 264','M61 80 L80 127 L79 260','M92 106 L93 191 L111 265',
+'M122 110 L132 204 L151 267','M156 112 L163 211 L189 277',
+'M196 124 L197 208 L232 273','M2 266 L67 260 L163 300',
+'M120 155 L216 166','M130 209 L239 219',
+'M346 -22 L353 126 L385 205','M379 -25 L389 105 L425 177',
+'M413 -20 L414 98 L447 152','M455 14 L483 121','M496 9 L528 117 L584 187',
+'M332 63 L449 52 L550 12','M341 114 L470 105 L603 70 L720 47',
+'M352 172 L438 159 L590 113 L718 100',
+'M402 209 L468 191 L567 157 L719 122',
+'M480 238 L559 214 L721 180','M510 286 L620 252 L724 223',
+'M583 300 L720 310','M614 354 L729 349',
+'M-10 406 L139 408 L204 450 L264 500',
+'M-10 442 L114 442 L220 482','M-10 482 L98 477 L220 503',
+'M-10 519 L105 523 L226 548','M-10 570 L96 567 L214 590',
+'M-10 625 L98 615 L206 633','M-10 676 L104 657 L205 689',
+'M45 376 L26 498 L52 692','M81 370 L67 465 L82 704',
+'M120 397 L105 526 L127 708','M159 414 L141 549 L154 708',
+'M192 440 L176 557 L180 711',
+'M388 508 L491 484 L617 475 L735 447',
+'M378 542 L494 521 L615 515 L737 490',
+'M376 578 L515 564 L632 557 L735 534',
+'M377 617 L511 607 L625 598 L731 581',
+'M375 661 L519 657 L634 641 L731 623',
+'M382 703 L516 696 L639 686 L738 672',
+'M425 494 L420 735','M472 484 L471 737','M520 477 L520 739',
+'M563 467 L559 737','M608 462 L602 735','M669 439 L670 739',
+'M200 292 L257 313 L284 390 L264 439',
+'M218 309 L192 361 L215 429','M253 316 L227 371 L242 440',
+'M390 270 L447 320 L466 366','M411 257 L465 297 L499 351',
+'M443 246 L499 290 L548 334',
+'M394 412 L466 391 L513 381','M405 444 L487 413',
+'M-30 91 L61 21 L153 -35','M-27 596 L45 681 L102 738',
+'M96 740 L145 686 L187 648','M552 -30 L584 44 L646 97 L745 137',
+'M745 44 L671 65 L622 112'
+];
+const clusters=[
+{x:112,y:147,cols:5,rows:3,dx:31,dy:31,tilt:3},
+{x:179,y:255,cols:5,rows:3,dx:15,dy:18,tilt:18},
+{x:232,y:302,cols:5,rows:8,dx:18,dy:18,tilt:20},
+{x:295,y:273,cols:5,rows:5,dx:18,dy:15,tilt:-5},
+{x:380,y:293,cols:5,rows:4,dx:18,dy:16,tilt:-32},
+{x:399,y:375,cols:7,rows:4,dx:18,dy:16,tilt:-11},
+{x:125,y:411,cols:8,rows:5,dx:17,dy:15,tilt:26},
+{x:322,y:528,cols:3,rows:9,dx:21,dy:17,tilt:3},
+{x:465,y:90,cols:5,rows:4,dx:21,dy:19,tilt:-22},
+{x:513,y:229,cols:6,rows:4,dx:20,dy:20,tilt:-22},
+{x:585,y:350,cols:5,rows:5,dx:18,dy:19,tilt:16},
+{x:441,y:489,cols:7,rows:5,dx:19,dy:20,tilt:3},
+{x:554,y:517,cols:6,rows:5,dx:19,dy:19,tilt:3},
+{x:390,y:645,cols:7,rows:4,dx:18,dy:17,tilt:2}
+];
+const centerline=[[270,-40],[285,80],[279,185],[280,242],[340,270],[394,272],[458,319],[521,371],[563,404],[557,433],[500,456],[410,469],[318,479],[256,498],[236,570],[205,740]];
+const waterDist=(x,y)=>{let best=Infinity;for(let i=1;i<centerline.length;i++){const [ax,ay]=centerline[i-1],[bx,by]=centerline[i],dx=bx-ax,dy=by-ay,t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy||1)));best=Math.min(best,Math.hypot(x-ax-dx*t,y-ay-dy*t));}return best;};
+const parks=[{x:123,y:327,rx:84,ry:47},{x:339,y:350,rx:49,ry:35},{x:531,y:199,rx:63,ry:43},{x:436,y:598,rx:62,ry:66}];
+const cityLot=(x,y)=>x>83&&x<600&&y>95&&y<667;
+const isPark=(x,y)=>parks.some(p=>Math.abs(x-p.x)<p.rx&&Math.abs(y-p.y)<p.ry);
+function tree(x,y,parent,r=3){svg('circle',{cx:x,cy:y,r:r+1.4,fill:'#a2cb91',opacity:.7},parent);svg('circle',{cx:x-1,cy:y-1,r,fill:'#73aa70'},parent);}
+function facility(p,g){const x=(p.x-X0)/S,y=(p.y-Y0)/S,type=p.type;
+  const tint={school:'#eaf0f6',market:'#fcf0e1',hospital:'#fceaea',civic:'#e6eff5',office:'#edecfa',park:'#a6d88c'}[type];
+  if(type==='park'){path(`M${x-16} ${y-13}l32 -2 5 26 -38 2Z`,'#a6d88c',g);for(const [dx,dy] of [[-10,-5],[10,-8],[-11,8],[9,7]])tree(x+dx,y+dy,g,2.3);line(`M${x-16} ${y+12}L${x+16} ${y-12}`,'#f8faed',2,g);return;}
+  rect(x-18,y-15,36,30,tint,g,{rx:1.5,stroke:'#d2d7d2','stroke-width':.65});
+  if(type==='school'){rect(x-15,y-12,21,13,'#879eaf',g);rect(x-15,y+3,21,8,'#a8bbc6',g);rect(x+8,y-12,7,23,'#91c5a1',g);line(`M${x+10} ${y-8}h4 M${x+10} ${y-2}h4 M${x+10} ${y+4}h4`,'#f9faf8',.65,g);}
+  else if(type==='market'){rect(x-15,y-10,30,16,'#aeb5bb',g);rect(x-15,y-10,30,4,'#d28c54',g);for(const dx of [-11,-4,3,10])rect(x+dx,y-1,5,4,'#e9edf0',g);rect(x-13,y+8,26,3,'#e2d8c6',g);}
+  else if(type==='hospital'){rect(x-12,y-12,24,24,'#c1cdd4',g);rect(x-4,y-8,8,16,'#fff',g);rect(x-8,y-4,16,8,'#fff',g);line(`M${x} ${y-7}v14 M${x-7} ${y}h14`,'#d65360',2,g);}
+  else if(type==='civic'){rect(x-13,y-9,26,17,'#a6b8c9',g);path(`M${x-16} ${y-10}l16 -7 16 7Z`,'#8198b1',g);for(const dx of [-8,0,8])rect(x+dx-1.5,y-6,3,11,'#edf3f4',g);line(`M${x-15} ${y+10}h30`,'#a0b1bf',2,g);}
+  else{rect(x-15,y-12,11,25,'#a8b4c5',g);rect(x-1,y-15,16,28,'#98a5bc',g);for(const dx of [-12,-8,-4,2,7,12])for(const dy of [-8,-2,4])rect(x+dx,y+dy,2.2,2.2,'#e7eff2',g);}
+}
 export function finishLandscape(root){
-  // This is an intentional replacement of the old grid AND the old fringe.
-  // Stable place/home/bridge selectors remain compatible with src/map.js.
   root.replaceChildren();
-  const r=rng(524817),defs=S('defs',{},root),dry=S('clipPath',{id:'ob-dry-v2'},defs);
-  P(poly([[-320,-260],[1940,-260],...riverPts(-90,-320,1940).reverse()]),'#fff',dry);
-  P(poly([...riverPts(90,-320,1940),[1940,1210],[-320,1210]]),'#fff',dry);
-  const townClip=S('clipPath',{id:'ob-urban-v2'},defs);
-  // Soft, generously sized outer city shape; no square-cell or stepped mask.
-  const north='M-170 275Q-202 147 -90 82Q-13 26 110 48Q207 -49 386 -41Q520 -2 652 -81Q841 -134 1033 -64Q1195 -94 1357 -38Q1575 -67 1694 91Q1810 158 1802 305Q1775 412 1870 472L1885 581L-230 581Z';
-  const south='M-215 410L1890 435Q1882 652 1781 723Q1830 856 1671 932Q1540 1010 1395 981Q1240 1055 1080 1018Q926 1103 729 1039Q536 1121 395 1030Q223 1072 105 996Q-77 976 -149 863Q-238 758 -198 631Z';
-  for(const d of [north,south])P(d,'#fff',townClip);
-
-  const base=S('g',{'aria-hidden':'true'},root);
-  R(-320,-260,2260,1470,'#dae9cb',base);
-  // Broad, slanted agricultural parcels are scenery behind the whole city.
-  for(let k=0;k<75;k++){
-    const x=-390+(k%12)*202+(r()-.5)*78,y=-310+Math.floor(k/12)*265+(r()-.5)*62;
-    const w=126+r()*120,h=100+r()*130,sl=(r()-.5)*38;
-    P(poly([[x,y],[x+w,y+sl],[x+w+sl*.3,y+h+sl*.4],[x+sl*.3,y+h]]),
-      ['#d1e3bb','#e6e7be','#c5dbad','#dae5bd','#e6e1b7','#bcd7ad'][Math.floor(r()*6)],base,{opacity:.81});
+  rect(-360,-180,2320,1320,'#dbeacb',root);
+  const rural=svg('g',{'aria-hidden':true},root),r=rand(60178);
+  // Only the outer countryside is decorative; the mapped city preserves source proportions.
+  for(let i=0;i<44;i++){const x=-300+(i%9)*242+(r()-.5)*45,y=-160+Math.floor(i/9)*240+(r()-.5)*36,w=132+r()*110,h=92+r()*130;rect(x,y,w,h,['#e1edcc','#d6e6ba','#e9ebcc','#cae0b9'][i%4],rural,{opacity:.52,rx:8});}
+  for(let i=0;i<135;i++){const x=-330+r()*2250,y=-155+r()*1220;if(x>X0-45&&x<X0+S*765&&y>-40&&y<940)continue;tree(x,y,rural,1.6+r()*2.3);}
+  const map=svg('g',{transform:`translate(${X0} ${Y0}) scale(${S})`},root);
+  rect(-10,-35,740,775,'#dcebcf',map);
+  for(const d of cityAreas)path(d,'#f1f2ee',map,{stroke:'#e1e6e0','stroke-width':.6});
+  for(const d of parkShapes)path(d,'#acdc80',map,{stroke:'#a9d18d','stroke-width':1});
+  const parkWalks=svg('g',{'aria-hidden':true},map);
+  for(const d of ['M64 291L191 331','M84 349L188 294','M302 367L335 319','M307 337L370 373','M400 641L472 546','M398 559L475 622','M487 207L574 171'])line(d,'#e7f5d0',1.5,parkWalks);
+  for(let i=0;i<200;i++){const x=r()*720,y=r()*700;if(isPark(x,y)&&r()<.85)tree(x,y,parkWalks,1+r()*2.2);}
+  const minor=svg('g',{'aria-hidden':true},map);
+  for(const d of local)road(d,minor);
+  const fan=svg('g',{'aria-hidden':true},map);
+  for(let i=0;i<12;i++){
+    const a=(i-7)*.145,x1=297+Math.sin(a)*29,y1=321+Math.cos(a)*17,x2=300+Math.sin(a)*210;
+    let y2=321+Math.cos(a)*160;if(y2>478)y2=478;
+    road(`M${x1.toFixed(1)} ${y1.toFixed(1)}Q${(x1+x2)/2} ${(y1+y2)/2+13} ${x2.toFixed(1)} ${y2.toFixed(1)}`,fan);
   }
-  for(const d of [
-    'M-320 145Q-200 74 -83 109Q27 175 18 258Q-95 326 -207 308L-320 310Z',
-    'M1440 -260Q1555 -183 1681 -218Q1804 -170 1940 -218L1940 64Q1815 89 1750 31Q1602 73 1520 -25Z',
-    'M-320 925Q-213 811 -100 863Q35 893 59 1007Q-10 1125 -184 1210L-320 1210Z',
-    'M1540 980Q1650 877 1771 941Q1882 920 1940 843L1940 1210L1550 1210Z'
-  ])P(d,'#b9d9ad',base,{opacity:.68});
-  const land=S('g',{'clip-path':'url(#ob-urban-v2)','aria-hidden':'true'},root);
-  R(-270,-180,2170,1330,'#f1f2ef',land);
-  for(const [d,color] of [
-    ['M-200 25Q70 -83 298 -11L366 205Q215 242 55 217L-190 222Z','#eef0eb'],
-    ['M744 -119Q1021 -160 1250 -51L1323 182Q1156 250 986 190L814 193Z','#eff1ec'],
-    ['M-177 709Q82 664 226 727L310 961Q88 1046 -135 920Z','#eef0e9'],
-    ['M1300 780Q1600 709 1845 834L1810 1044Q1585 1091 1330 978Z','#eff1ec'],
-    ['M-230 362Q-56 318 44 360L70 531Q-41 584 -230 554Z','#e8eedf'],
-    ['M1540 408Q1747 333 1915 380L1925 585Q1732 630 1582 541Z','#e9efdf'],
-    ['M93 944Q244 886 339 937Q397 1022 340 1120L101 1134Z','#e7eedf'],
-    ['M1080 -178Q1198 -109 1314 -137Q1387 -83 1380 16L1090 36Z','#e6eddd']
-  ])P(d,color,land);
-  const river=S('g',{'aria-hidden':'true'},root);
-  P(band(-79,79),'#b5dba9',river);
-  P(band(-57,57),'#84cde8',river,{stroke:'#b0dbe6','stroke-width':1.2});
-  for(const side of [-1,1])L('M'+riverPts(side*63).map(p=>p.join(' ')).join('L'),'#8ecb99',2,river);
-
-  // Roads and buildings use the SAME line geometry. Two clip paths ensure
-  // no road reaches the water or continues as a city grid into farmland.
-  const roadInTown=S('g',{'clip-path':'url(#ob-urban-v2)','aria-hidden':'true'},root);
-  const streets=S('g',{'clip-path':'url(#ob-dry-v2)'},roadInTown),roads=[];
-  function roadway(d,kind='local'){
-    const w=kind==='trunk'?13:kind==='arterial'?10:kind==='collector'?7.6:4.5;
-    const edge=kind==='trunk'?'#abb9b6':kind==='arterial'?'#dbbd83':'#dce2df';
-    const body=kind==='trunk'?'#f9faf7':kind==='arterial'?'#f3db9e':'#ffffff';
-    L(d,edge,w+3.1,streets);L(d,body,w,streets);
-    const probe=P(d,'none',streets,{stroke:'none'}),length=probe.getTotalLength(),sample=[];
-    for(let t=0;t<=length;t+=9){const p=probe.getPointAtLength(t);sample.push([p.x,p.y]);}
-    const last=probe.getPointAtLength(length);sample.push([last.x,last.y]);probe.remove();
-    roads.push({sample,w});
+  for(const d of ['M188 349Q294 381 401 351','M167 383Q293 419 466 396','M138 415Q299 465 481 435','M165 447Q300 496 451 465'])road(d,fan);
+  const footprints=svg('g',{'aria-hidden':true},map),lotR=rand(8791),occupied=[];
+  for(const c of clusters)for(let row=0;row<c.rows;row++)for(let col=0;col<c.cols;col++){
+    if(lotR()<.17)continue;
+    const x=c.x+col*c.dx+(lotR()-.5)*4,y=c.y+row*c.dy+(lotR()-.5)*4;
+    if(waterDist(x,y)<36||isPark(x,y)||!cityLot(x,y))continue;
+    if(places.some(p=>Math.hypot((p.x-X0)/S-x,(p.y-Y0)/S-y)<22))continue;
+    const w=7+lotR()*7,h=6+lotR()*8;
+    rect(x-w/2,y-h/2,w,h,lotR()<.21?'#d6dce0':'#bbc6cc',footprints,{rx:.6,transform:`rotate(${c.tilt} ${x} ${y})`,stroke:'#b1bcc2','stroke-width':.55});
+    occupied.push([x,y]);
   }
-  // Through-routes and collectors follow broad corridors, not tile boundaries.
-  roadway('M-310 -51Q82 -116 400 -87Q690 -148 975 -100Q1329 -141 1609 -72Q1841 -5 1920 140','trunk');
-  roadway('M-305 1064Q27 964 291 1025Q555 1071 778 1040Q1173 1091 1517 1030Q1772 1053 1940 923','trunk');
-  roadway('M-320 210Q115 190 349 185Q659 205 854 180Q1168 204 1480 181Q1750 190 1940 229','arterial');
-  roadway('M-320 675Q30 682 365 660Q625 643 854 668Q1145 647 1453 677Q1696 695 1940 643','arterial');
-  roadway('M-300 834Q40 810 352 835Q585 861 875 818Q1224 827 1550 852Q1783 888 1940 806','collector');
-  roadway('M-280 79Q6 102 235 85Q479 72 732 97Q1015 69 1311 91Q1645 74 1900 115','collector');
-  roadway('M-300 291Q54 299 333 292Q628 302 854 277Q1092 301 1420 293Q1685 312 1940 295','collector');
-  roadway('M-300 588Q60 570 365 595Q596 571 868 589Q1228 566 1573 591Q1740 598 1940 577','collector');
-  roadway('M-290 753Q59 742 357 762Q641 744 859 762Q1141 737 1502 767Q1760 768 1940 743','collector');
-  roadway('M-260 924Q89 909 347 942Q606 924 858 944Q1138 916 1497 947Q1733 978 1940 942','collector');
-  for(const [x,bend] of [[-105,-20],[50,12],[169,-17],[279,20],[350,0],[431,-14],[559,22],[668,-11],[769,25],[850,0],[954,-15],[1078,18],[1173,-12],[1250,0],[1368,20],[1491,-14],[1603,25],[1750,-18]]){
-    const main=[350,850,1250].includes(x);
-    roadway(`M${x+bend} -160 Q${x-bend*.6} 110 ${x} 305 Q${x+bend*.3} 455 ${x} 592 Q${x-bend*.4} 791 ${x+bend} 1110`,main?'arterial':'collector');
+  const sites=svg('g',{'aria-hidden':true},map);
+  for(const p of places)facility(p,sites);
+  const highways=svg('g',{'aria-hidden':true},map);
+  for(const d of arterials)road(d,highways,'arterial');
+  // An opaque channel masks conventional roads; only named crossings overlay the water.
+  const bank=svg('g',{'aria-hidden':true},map);
+  line(riverEdgeLeft,'#9dd09b',12,bank);line(riverEdgeRight,'#9dd09b',12,bank);
+  path(waterShape,'#70c3eb',bank,{stroke:'#9bd5dc','stroke-width':1});
+  line(riverEdgeLeft,'#8dd19d',4,bank);line(riverEdgeRight,'#8dd19d',4,bank);
+  const bridgePaths={'ponte-norte':'M268 266 L341 218','ponte-central':'M478 365 L563 337','ponte-sul':'M204 486 L260 522'};
+  const crossings=svg('g',{id:'bridge-layer'},map);
+  for(const b of bridges){const d=bridgePaths[b.id],g=svg('g',{class:'bridge-hit','data-bridge':b.id,role:'button',tabindex:0,'aria-label':`Inspecionar ${b.name}`},crossings);if(!d)continue;
+    line(d,'#d1b46e',10,g);line(d,'#ffd16c',7,g,{class:'bridge-deck'});
+    const bx=(b.x-X0)/S,by=(b.y-Y0)/S;svg('circle',{cx:bx,cy:by,r:15,fill:'transparent'},g);
+    text(b.name,bx+16,by-10,g,'bridge-label',{'font-size':8,'paint-order':'stroke','stroke':'white','stroke-width':2.5});
   }
-  // Oblique and gently bending streets break the grid in outer districts.
-  for(const d of [
-    'M-185 400Q45 351 226 306','M230 80Q320 7 443 -26',
-    'M900 88Q997 28 1120 -38','M1444 92Q1570 10 1715 -38',
-    'M-173 838Q-75 911 43 972','M378 947Q489 1006 600 1055',
-    'M1040 950Q1123 998 1210 1072','M1545 932Q1655 1009 1763 1057',
-    'M70 345Q123 420 164 520','M1580 350Q1512 420 1493 538'
-  ])roadway(d);
-  // The two continuous riverside avenues connect with landward feeders.
-  for(const side of [-1,1])roadway('M'+riverPts(side*89).map(p=>`${p[0]} ${p[1].toFixed(1)}`).join('L'),'collector');
-
-  const parks=S('g',{'aria-hidden':'true'},root);
-  for(const [x,y,rx,ry] of [[118,170,55,43],[730,166,70,41],[1486,165,53,43],[95,643,53,46],[748,748,49,43],[1525,813,58,43],[-75,735,80,90],[1700,332,68,84],[1550,986,86,58]]){
-    P(`M${x-rx} ${y-ry*.4}Q${x-rx*.85} ${y-ry} ${x-rx*.23} ${y-ry}Q${x+rx*.74} ${y-ry*1.07} ${x+rx} ${y-ry*.25}Q${x+rx*1.1} ${y+ry*.68} ${x+rx*.26} ${y+ry}Q${x-rx*.87} ${y+ry*.93} ${x-rx} ${y-ry*.4}Z`,'#c2dfa9',parks,{stroke:'#aed29f','stroke-width':1});
-    for(let i=0;i<9;i++)C(x+(r()-.5)*rx*1.5,y+(r()-.5)*ry*1.25,2+r()*3,'#a2cc97',parks);
+  const homes=svg('g',{id:'homes-layer'},map);let homeCount=0;
+  for(const [x,y] of occupied){if(homeCount>=230)break;if(lotR()<.3)continue;
+    let nearest=1e9;for(const p of places)nearest=Math.min(nearest,Math.hypot(x-(p.x-X0)/S,y-(p.y-Y0)/S));if(nearest<24)continue;
+    homeCount++;
+    const region=y<310?(x<340?'norte-verde':x<520?'jardim-do-rio':'vale-do-sol'):(x<230?'vila-industrial':x<390?'centro-civico':x<540?'parque-leste':'colinas-do-sul');
+    const g=svg('g',{class:'home-node','data-home':`casa-${String(homeCount).padStart(3,'0')}`,'data-region':region,role:'button',tabindex:0,'aria-label':`Inspecionar residência ${homeCount}`},homes);
+    svg('circle',{cx:x,cy:y,r:3.3,fill:'#418b65',stroke:'#fff','stroke-width':1.1},g);
+    svg('circle',{cx:x,cy:y,r:8,fill:'transparent'},g);
   }
-  // Dedicated public-building footprints exactly match the clickable markers.
-  const sites=S('g',{'aria-hidden':'true'},root);
-  const reserved=places.map(p=>({x:p.x,y:p.y,r:p.type==='park'?51:47}));
-  for(const p of places){const x=p.x,y=p.y;
-    if(p.type==='park'){
-      P(`M${x-39} ${y-31}L${x+32} ${y-36}Q${x+44} ${y} ${x+38} ${y+28}L${x-32} ${y+34}Z`,'#b7dba5',sites,{stroke:'#97c68f','stroke-width':1});
-      L(`M${x-35} ${y+22}Q${x} ${y+2} ${x+34} ${y-21}`,'#f5f7ed',3,sites);
-      for(let i=0;i<12;i++)C(x-27+r()*56,y-25+r()*49,2+r()*3,'#8bbf83',sites);
-      continue;
-    }
-    const ground={school:'#e6eddf',hospital:'#f3e4e6',civic:'#e6ebee',market:'#f6ede0',office:'#e7e9ec'}[p.type];
-    R(x-38,y-31,76,62,ground,sites,{rx:5,stroke:'#d9deda','stroke-width':1});
-    if(p.type==='school'){
-      R(x-30,y-22,57,25,'#acbac1',sites,{rx:2});R(x-30,y+9,57,15,'#d2c9aa',sites,{rx:1});L(`M${x-27} ${y+16}h49`,'#fff',1,sites);
-    }else if(p.type==='hospital'){
-      R(x-30,y-21,60,42,'#aebbc2',sites,{rx:2});R(x-7,y-6,14,14,'#fff',sites,{rx:2});L(`M${x} ${y-4}v10M${x-5} ${y+1}h10`,'#c95760',2.5,sites);
-    }else if(p.type==='civic'){
-      R(x-29,y-19,58,37,'#adbcc6',sites,{rx:1});L(`M${x-32} ${y-21}h64`,'#8e9da7',3,sites);
-      for(const dx of [-17,-5,7,19])R(x+dx,y,5,15,'#ebf0f1',sites);
-    }else if(p.type==='market'){
-      R(x-31,y-20,62,37,'#babebc',sites,{rx:2});R(x-31,y-20,62,8,'#db9a67',sites);
-      for(const dx of [-21,-5,12])R(x+dx,y-4,9,11,'#eaf1f1',sites);
-    }else{
-      R(x-30,y-24,27,42,'#aebac2',sites,{rx:2});R(x+4,y-19,26,37,'#9cabb5',sites,{rx:2});
-      for(const dx of [-24,-14,-4,9,19])for(const dy of [-12,-3,6])R(x+dx,y+dy,4,4,'#e8efee',sites);
-    }
-  }
-
-  // An indexed spatial collision test positions residences on buildings,
-  // never in roads, water, reserved civic sites or planted public parks.
-  const roadBins=new Map(),bucket=36;
-  for(const rd of roads)for(const [px,py] of rd.sample){
-    const key=`${Math.floor(px/bucket)}:${Math.floor(py/bucket)}`;
-    if(!roadBins.has(key))roadBins.set(key,[]);
-    roadBins.get(key).push([px,py,rd.w]);
-  }
-  const nearStreet=(x,y,clearance)=>{
-    const bx=Math.floor(x/bucket),by=Math.floor(y/bucket);
-    for(let yy=by-1;yy<=by+1;yy++)for(let xx=bx-1;xx<=bx+1;xx++){
-      for(const p of roadBins.get(`${xx}:${yy}`)||[])if(Math.hypot(x-p[0],y-p[1])<clearance+p[2]/2+2)return true;
-    }
-    return false;
-  };
-  const buildings=S('g',{'aria-hidden':'true'},root),homes=S('g',{id:'homes-layer'},root),blocks=[];
-  const density=(x,y)=>{
-    if(x>-5&&x<1605&&y>-5&&y<910)return .93;
-    const dist=Math.hypot(Math.max(0,100-x,x-1490),Math.max(0,120-y,y-812));
-    return Math.max(.05,.67-dist/340);
-  };
-  const greenSites=[[118,170,55,43],[730,166,70,41],[1486,165,53,43],[95,643,53,46],[748,748,49,43],[1525,813,58,43]];
-  for(let y=-118;y<1060;y+=21)for(let x=-165;x<1830;x+=23){
-    const cx=x+(r()-.5)*10,cy=y+(r()-.5)*9;
-    if(Math.abs(cy-riverY(cx))<103||r()>density(cx,cy))continue;
-    const w=8+r()*7,h=8+r()*7;
-    if(reserved.some(p=>Math.abs(cx-p.x)<p.r+11&&Math.abs(cy-p.y)<p.r+10)||
-       nearStreet(cx,cy,Math.max(w,h)*.44+1)||
-       greenSites.some(p=>Math.abs(cx-p[0])<p[2]+9&&Math.abs(cy-p[1])<p[3]+9))continue;
-    R(cx-w/2,cy-h/2,w,h,r()<.22?'#d7dddd':'#c7cfd0',buildings,{rx:1.5,stroke:'#bdc6c6','stroke-width':.6});
-    blocks.push({x:cx,y:cy});
-  }
-  const eligible=blocks.filter(b=>b.x>32&&b.x<1565&&b.y>45&&b.y<870);
-  let homeCount=0;
-  for(let i=0;i<eligible.length&&homeCount<230;i+=Math.max(1,Math.floor(eligible.length/230))){
-    const b=eligible[i];homeCount++;
-    const region=b.y<riverY(b.x)?(b.x<800?'norte-verde':b.x<1350?'jardim-do-rio':'vale-do-sol'):
-      (b.x<330?'vila-industrial':b.x<810?'centro-civico':b.x<1260?'parque-leste':'colinas-do-sul');
-    const group=S('g',{class:'home-node','data-home':`casa-${String(homeCount).padStart(3,'0')}`,'data-region':region,role:'button',tabindex:0,'aria-label':`Inspecionar residência ${homeCount}`},homes);
-    C(b.x,b.y,3.7,'#498d6d',group,{stroke:'#fff','stroke-width':1.2});
-  }
-
-  // Water occludes city artwork; only bridge decks cross the channel.
-  const water=S('g',{'aria-label':'Rio central'},root);
-  P(band(-57,57),'#83cbe7',water,{stroke:'#a2d5e0','stroke-width':1.1});
-  for(const side of [-1,1])L('M'+riverPts(side*61).map(p=>`${p[0]} ${p[1].toFixed(1)}`).join('L'),'#88bc8b',1.7,water);
-  const crossing=S('g',{id:'bridge-layer'},root);
-  for(const b of bridges){const x=b.x,y=riverY(x);
-    const group=S('g',{class:'bridge-hit','data-bridge':b.id,tabindex:0,role:'button','aria-label':`Inspecionar ${b.name}`},crossing);
-    L(`M${x} ${y-102}L${x} ${y+102}`,'#d2b573',17,group,{class:'bridge-deck'});
-    L(`M${x} ${y-102}L${x} ${y+102}`,'#f1d38b',13,group);
-    L(`M${x-6} ${y-66}L${x-6} ${y+66}M${x+6} ${y-66}L${x+6} ${y+66}`,'#fff8e7',1.3,group);
-    R(x-18,y-63,36,126,'transparent',group);
-  }
-  const flows=S('g',{id:'flows-layer',class:'map-layer-hidden'},root);
-  for(const b of bridges)L(`M${b.x} ${b.y-108}L${b.x} ${b.y+108}`,'#327cce',2.5,flows,{class:'flow','data-flow-bridge':b.id});
-
-  // Labels and clickable POIs render last and are never clipped by landuse.
-  const labels=S('g',{'aria-hidden':'true'},root);
-  label('RIO CENTRAL',760,riverY(760)+5,labels,'river-label');
-  const anchors={
-    'norte-verde':[480,121],'jardim-do-rio':[1050,121],'vale-do-sol':[1440,121],
-    'centro-civico':[552,554],'vila-industrial':[205,864],
-    'parque-leste':[1050,555],'colinas-do-sul':[1405,684]
-  };
-  for(const d of districts){const [x,y]=anchors[d.id]||[d.x,d.y];label(d.name,x,y,labels,'district-label');}
-  for(const [text,x,y] of [['MORRO DOS PINHEIROS',20,-80],['JARDIM DAS FLORES',1007,-60],['BAIRRO DAS OLIVEIRAS',1700,135],['SÍTIO DO VALE',-145,951],['CHÁCARAS DO SUL',1550,1018]]){
-    label(text,x,y,labels,'',{'font-size':10,'letter-spacing':1.1,fill:'#77917d','font-weight':600});
-  }
-  const hubs=S('g',{id:'places-layer'},root);
-  for(const p of places){const g=S('g',{class:'map-place','data-place':p.id,role:'button',tabindex:0,'aria-label':`Inspecionar ${p.name}`},hubs);
-    R(p.x-38,p.y-32,76,65,'transparent',g,{rx:4});
-    C(p.x,p.y-3,11,placeColors[p.type],g,{stroke:'#fff','stroke-width':2.4,class:'place-bubble'});
-    label(placeGlyphs[p.type],p.x,p.y+1,g,'',{'font-size':p.type==='hospital'?16:10,fill:'#fff','font-weight':800});
-    label({school:'Escola',market:'Mercado',hospital:'Hospital',civic:'Prefeitura',office:'Empresa',park:'Praça'}[p.type],p.x,p.y+29,g,'place-label');
+  const flows=svg('g',{id:'flows-layer',class:'map-layer-hidden'},map);
+  for(const b of bridges){const d=bridgePaths[b.id];if(d)line(d,'#377ed0',2.2,flows,{class:'flow','data-flow-bridge':b.id});}
+  const names=svg('g',{'aria-hidden':true},map);
+  for(const d of districts){const x=(d.x-X0)/S,y=(d.y-Y0)/S;text(d.name,x,y,names,'district-label',{'text-anchor':'middle','font-size':10,'stroke-width':2.5});}
+  text('RIO CENTRAL',442,421,names,'river-label',{'font-size':11,'letter-spacing':3,'text-anchor':'middle',transform:'rotate(-13 442 421)'});
+  const hubs=svg('g',{id:'places-layer'},map);
+  for(const p of places){const x=(p.x-X0)/S,y=(p.y-Y0)/S;
+    const g=svg('g',{class:'map-place','data-place':p.id,role:'button',tabindex:0,'aria-label':`Inspecionar ${p.name}`},hubs);
+    rect(x-20,y-19,40,40,'transparent',g,{rx:2});
+    svg('circle',{cx:x,cy:y-4,r:9,fill:placeColors[p.type],stroke:'#fff','stroke-width':2,class:'place-bubble'},g);
+    text(placeGlyphs[p.type],x,y-.7,g,'',{'text-anchor':'middle',fill:'white','font-size':9,'font-weight':800});
+    text({school:'Escola',market:'Mercado',hospital:'Hospital',civic:'Prefeitura',office:'Empresa',park:'Praça'}[p.type],x,y+18,g,'place-label',{'text-anchor':'middle','font-size':8});
   }
   return {homeCount};
 }
