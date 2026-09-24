@@ -1,17 +1,54 @@
 import {WIDTH,HEIGHT,districts,bridges,places} from './city-data.js';
 import {drawCity} from './city-map.js';
+import {finishLandscape} from './landscape.js';
 const $=id=>document.getElementById(id);
-const svg=$('city-map'),viewport=$('map-viewport');drawCity($('map-world'));
+const svg=$('city-map'),viewport=$('map-viewport');
+const world=$('map-world');
+drawCity(world);
+finishLandscape(world);
 const bridgeState=Object.fromEntries(bridges.map(b=>[b.id,true]));
+// The central 1600x900 city remains at its original coordinates. Only zooming OUT
+// exposes the extra countryside; no building, bridge or node positions need changing.
+const bounds={left:-220,top:-130,right:1820,bottom:1030};
+const maxWidth=bounds.right-bounds.left;
 let view={x:0,y:0,w:WIDTH,h:HEIGHT},drag=null;
+const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 function updateView(){svg.setAttribute('viewBox',`${view.x} ${view.y} ${view.w} ${view.h}`);}
-function zoom(factor,centerX=WIDTH/2,centerY=HEIGHT/2){const w=Math.max(240,Math.min(WIDTH,view.w*factor)),h=w*HEIGHT/WIDTH;const fx=(centerX-view.x)/view.w,fy=(centerY-view.y)/view.h;view.x=Math.max(0,Math.min(WIDTH-w,centerX-fx*w));view.y=Math.max(0,Math.min(HEIGHT-h,centerY-fy*h));view.w=w;view.h=h;updateView();}
+function constrain(){view.x=clamp(view.x,bounds.left,bounds.right-view.w);view.y=clamp(view.y,bounds.top,bounds.bottom-view.h);}
+function zoom(factor,centerX=view.x+view.w/2,centerY=view.y+view.h/2){
+  const w=clamp(view.w*factor,240,maxWidth),h=w*HEIGHT/WIDTH;
+  const fx=(centerX-view.x)/view.w,fy=(centerY-view.y)/view.h;
+  view={x:centerX-fx*w,y:centerY-fy*h,w,h};constrain();updateView();
+}
 const reset=()=>{view={x:0,y:0,w:WIDTH,h:HEIGHT};updateView();};
-$('reset-view').onclick=reset;$('zoom-reset').onclick=reset;$('zoom-in').onclick=()=>zoom(.78);$('zoom-out').onclick=()=>zoom(1.28);
-viewport.addEventListener('wheel',e=>{e.preventDefault();const r=svg.getBoundingClientRect(),ratio=WIDTH/HEIGHT,boxRatio=r.width/r.height;let left=r.left,top=r.top,width=r.width,height=r.height;if(boxRatio>ratio){width=r.height*ratio;left+=(r.width-width)/2;}else{height=r.width/ratio;top+=(r.height-height)/2;}const fx=Math.max(0,Math.min(1,(e.clientX-left)/width)),fy=Math.max(0,Math.min(1,(e.clientY-top)/height));zoom(e.deltaY<0?.82:1.22,view.x+view.w*fx,view.y+view.h*fy);},{passive:false});
-viewport.addEventListener('pointerdown',e=>{if(e.target.closest('[data-place],[data-home],[data-bridge]'))return;drag={x:e.clientX,y:e.clientY,originX:view.x,originY:view.y,pointer:e.pointerId};viewport.setPointerCapture(e.pointerId);viewport.classList.add('dragging');});
-viewport.addEventListener('pointermove',e=>{if(!drag)return;const r=svg.getBoundingClientRect();const s=Math.max(r.width/WIDTH,r.height/HEIGHT);view.x=Math.max(0,Math.min(WIDTH-view.w,drag.originX-(e.clientX-drag.x)/s*view.w/WIDTH));view.y=Math.max(0,Math.min(HEIGHT-view.h,drag.originY-(e.clientY-drag.y)/s*view.h/HEIGHT));updateView();});
-const stopDrag=()=>{drag=null;viewport.classList.remove('dragging');};viewport.addEventListener('pointerup',stopDrag);viewport.addEventListener('pointercancel',stopDrag);
+$('reset-view').onclick=reset;$('zoom-reset').onclick=reset;
+$('zoom-in').onclick=()=>zoom(.78);$('zoom-out').onclick=()=>zoom(1.28);
+// Use the true rendered SVG region (which may letterbox on narrow screens).
+function screenRect(){
+  const r=svg.getBoundingClientRect(),ratio=WIDTH/HEIGHT;
+  let left=r.left,top=r.top,width=r.width,height=r.height;
+  if(width/height>ratio){width=height*ratio;left+=(r.width-width)/2;}
+  else{height=width/ratio;top+=(r.height-height)/2;}
+  return {left,top,width,height};
+}
+viewport.addEventListener('wheel',e=>{
+  e.preventDefault();const r=screenRect();
+  const fx=clamp((e.clientX-r.left)/r.width,0,1),fy=clamp((e.clientY-r.top)/r.height,0,1);
+  zoom(e.deltaY<0?.82:1.22,view.x+view.w*fx,view.y+view.h*fy);
+},{passive:false});
+viewport.addEventListener('pointerdown',e=>{
+  if(e.target.closest('[data-place],[data-home],[data-bridge]'))return;
+  drag={x:e.clientX,y:e.clientY,originX:view.x,originY:view.y,pointer:e.pointerId};
+  viewport.setPointerCapture(e.pointerId);viewport.classList.add('dragging');
+});
+viewport.addEventListener('pointermove',e=>{
+  if(!drag||e.pointerId!==drag.pointer)return;
+  const r=screenRect();view.x=drag.originX-(e.clientX-drag.x)*view.w/r.width;
+  view.y=drag.originY-(e.clientY-drag.y)*view.h/r.height;
+  constrain();updateView();
+});
+const stopDrag=()=>{drag=null;viewport.classList.remove('dragging');};
+viewport.addEventListener('pointerup',stopDrag);viewport.addEventListener('pointercancel',stopDrag);
 $('toggle-places').onchange=e=>$('places-layer').classList.toggle('map-layer-hidden',!e.target.checked);
 $('toggle-homes').onchange=e=>$('homes-layer').classList.toggle('map-layer-hidden',!e.target.checked);
 $('toggle-flows').onchange=e=>$('flows-layer').classList.toggle('map-layer-hidden',!e.target.checked);
