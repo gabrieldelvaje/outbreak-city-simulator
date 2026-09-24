@@ -1,0 +1,48 @@
+/* Dark colors are restricted to the new theme: the original light palette is intact. */
+html[data-theme="dark"]{color-scheme:dark;background:#192331}
+html[data-theme="dark"] body{color:#e9eef5;background:#192331}
+html[data-theme="dark"] .topbar,html[data-theme="dark"] .sidebar,html[data-theme="dark"] .footer{background:#202b3b;border-color:#344458;color:#e9eef5}
+html[data-theme="dark"] .brand-mark{background:#3a536a;color:#fff}
+html[data-theme="dark"] .brand small,html[data-theme="dark"] .top-actions,html[data-theme="dark"] .eyebrow,html[data-theme="dark"] .section-label,html[data-theme="dark"] .intro,html[data-theme="dark"] .caveat,html[data-theme="dark"] .switch-row small,html[data-theme="dark"] .bridge-control small,html[data-theme="dark"] .footer{color:#b0bed0}
+html[data-theme="dark"] .alpha{color:#83c9ab}
+html[data-theme="dark"] .ghost,html[data-theme="dark"] .theme-toggle{background:#2a394d;color:#eaf0f8;border:1px solid #43536a}
+html[data-theme="dark"] .ghost:hover,html[data-theme="dark"] .theme-toggle:hover{background:#35465c}
+html[data-theme="dark"] .switch-row{border-color:#344458}
+html[data-theme="dark"] .switch-row input{accent-color:#81c7ab}
+html[data-theme="dark"] .bridge-control{background:#27374a;border-color:#41536a;color:#e9eef5}
+html[data-theme="dark"] .bridge-control button{background:#234638;color:#a4e3bd;border-color:#3a755b}
+html[data-theme="dark"] .bridge-control button.closed{background:#533438;color:#ffb0a9;border-color:#845258}
+html[data-theme="dark"] .chip{background:#304154;color:#d9e3ef}
+html[data-theme="dark"] .map-shell{background:#223146}
+html[data-theme="dark"] .map-note,html[data-theme="dark"] .map-legend,html[data-theme="dark"] .inspector{background:#263549f5;border-color:#45576e;box-shadow:0 4px 18px #0c142b55;color:#e9eef5}
+html[data-theme="dark"] .map-note,html[data-theme="dark"] .map-legend,html[data-theme="dark"] .inspector-heading,html[data-theme="dark"] .inspector p{color:#b6c5d8}
+html[data-theme="dark"] .inspector h2{color:#eff4fb}
+html[data-theme="dark"] .inspector-heading button,html[data-theme="dark"] .zoom-controls,html[data-theme="dark"] .zoom-controls button{background:#2a3b50;color:#eff4fb;border-color:#45576e}
+html[data-theme="dark"] .pill{background:#24483e;color:#a9e3c8}
+html[data-theme="dark"] .person-graph{background:#1c2b3e}
+html[data-theme="dark"] .district-label{fill:#dbe3f0;stroke:#223146}
+html[data-theme="dark"] .district-caption,html[data-theme="dark"] .outskirts-label{fill:#b9c7d9;stroke:#223146}
+html[data-theme="dark"] .place-label,html[data-theme="dark"] .bridge-label{fill:#e7edf6!important;stroke:#223146!important}
+html[data-theme="dark"] .river-label{fill:#b7cfe6}
+html[data-theme="dark"] .map-place:hover .place-bubble,html[data-theme="dark"] .home-node:hover circle{stroke:#d9e6f4}
+html[data-theme="dark"] .theme-toggle:focus-visible{outline-color:#a4c9f4}
+
+/* Original SVG paint values double as semantic selectors, even when the light
+   palette sets an inline style. The important overrides apply ONLY in dark mode. */
+html[data-theme="dark"] #map-world [fill="#e5e5e5"]{fill:#243348!important} /* city land */
+html[data-theme="dark"] #map-world [fill="#dceacb"]{fill:#173b40!important} /* surrounding greenery */
+html[data-theme="dark"] #map-world [fill="#fff87b"]{fill:#2b384b!important} /* riverbanks */
+html[data-theme="dark"] #map-world [fill="#74cbec"]{fill:#0b2138!important} /* river */
+html[data-theme="dark"] #map-world [fill="#a0dd3c"]{fill:#205047!important} /* parks */
+html[data-theme="dark"] #map-world [fill="#f8f8f8"]{fill:#36485f!important} /* local streets */
+html[data-theme="dark"] #map-world [fill="#f4ba3e"]{fill:#6b829e!important} /* main roads */
+html[data-theme="dark"] #map-world [fill="#c1c1c1"]{fill:#37475e!important} /* roofs */
+html[data-theme="dark"] #map-world [stroke="#f8f8f8"]{stroke:#50627a!important} /* residential road outlines */
+html[data-theme="dark"] #map-world [stroke="#f9faf8"]{stroke:#50627a!important} /* peripheral streets */
+html[data-theme="dark"] #map-world [stroke="#f4ba3e"]{stroke:#6b829e!important} /* avenue joins */
+/* The raster fallback is visible only briefly while the original SVG is inlined. */
+html[data-theme="dark"] #reference-city > image[href*="city-reference.svg"]{filter:brightness(.53) saturate(.73) hue-rotate(8deg)}
+/* Interactive markers preserve their epidemiological category/status colors. */
+.theme-toggle{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;border:1px solid #e2e9e4;background:#f5f7f5;color:#30464c;border-radius:9px;padding:8px 11px;font:inherit;font-size:12px}
+.theme-toggle__icon{font-size:16px;line-height:1}
+@media(max-width:780px){.theme-toggle{padding:7px 9px}.theme-toggle__label{display:none}.top-actions{gap:6px}}
