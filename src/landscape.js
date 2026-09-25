@@ -85,7 +85,7 @@ function countryside(root){
  for(const d of [
   'M-240 -210H1840V-150L1510 -132 1320 -118 1110 -126 910 -112 690 -132 470 -116 240 -138 -240 -112Z',
   'M-240 -210L105 -210 82 -78 58 65 35 205 18 360 28 520 52 690 92 835 45 980 -240 1010Z',
-  'M1840 -210V1140H1535L1494 990 1520 830 1502 665 1518 500 1495 335 1515 165 1545 -35Z',
+  'M1840 -210V1140H1262L1258 980 1265 820 1260 650 1267 500 1261 335 1268 165 1265 -35Z',
   'M-240 1140V1055L70 1028 310 1046 565 1032 810 1050 1055 1034 1295 1050 1540 1025 1840 1060V1140Z'
  ])P(d,f,g);
 
@@ -102,6 +102,13 @@ export function finishLandscape(root){
  root.replaceChildren();countryside(root);
  const frame=E('g',{id:'reference-city',transform:`translate(${MAP.x} ${MAP.y}) scale(${MAP.scale})`},root);
  E('image',{href:'./assets/city-reference.svg',x:0,y:0,width:MAP.size,height:MAP.size,'pointer-events':'none','aria-hidden':'true'},frame);
+ // East of the right-bank north/south highway is rural land. The source SVG
+ // has a gray square background there, so mask only that strip in green while
+ // keeping the highway itself as the visible boundary of the urban area.
+ P('M706 0L709 34 710 60 714 122 719 159 719 248 723 259 721 277 725 368 718 383 713 392 688 436 663 494 647 515 654 655 666 704 666 711 670 730 675 740H740V0Z','#dceacb',frame,{
+  class:'east-rural-beyond-highway',
+  'pointer-events':'none'
+ });
  const homes=E('g',{id:'homes-layer'},frame);const homeCount=addHomes(homes);
  const hubs=E('g',{id:'places-layer'},frame);
  for(const p of places)makeFacility(p,hubs);
