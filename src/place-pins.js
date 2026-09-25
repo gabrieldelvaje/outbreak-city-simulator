@@ -86,25 +86,28 @@ function renderPins(){
       'pointer-events':'none',
       'aria-hidden':'true'
     },pin);
+    const tooltipFloat=svg('g',{class:'place-pin-tooltip-float'},tooltip);
     svg('rect',{
       x:-tooltipWidth/2,y:-8,width:tooltipWidth,height:15,rx:5,
       class:'place-pin-tooltip-bg'
-    },tooltip);
+    },tooltipFloat);
     const tooltipText=svg('text',{
       x:0,y:2.1,
       class:'place-pin-tooltip-text',
       'text-anchor':'middle',
       'font-size':6.2,
       'font-weight':650
-    },tooltip);
+    },tooltipFloat);
     tooltipText.textContent=tooltipName;
 
-    const label=place.querySelector(':scope > .place-label');
-    if(label)place.insertBefore(pin,label);
+    // Remove the original permanent SVG text completely. The name is shown only
+    // by the hover/focus tooltip above the pin.
+    place.querySelector(':scope > .place-label')?.remove();
     dot?.remove();
     oldGlyph?.remove();
     // Parks retain their transparent hit targets, including their original clicks.
   }
+  layer.querySelectorAll('.place-label').forEach(label=>label.remove());
   paintPins();
   return true;
 }
