@@ -102,8 +102,27 @@ function matrixForLayer(cfg,layer){let key=layer;if(layer==='retail'||layer==='h
 function alertExpected(cfg,day){const week=((cfg.startEpiWeek-1+Math.floor(day/7))%52)+1;const rate=Number(cfg.alert.weeklyBaselinePer100k?.[String(week)]??0);return {week,expected:rate*cfg.population/100000};}
 export function simulate(config,options={}){
  const cfg=requireValid(structuredClone(config)),rand=rng((cfg.seed^0x9e3779b9)>>>0),city=makeCity(cfg),P=city.agents;const events=[],daily=[],reports=new Map(),transmissionByLayer={},alertDays=[];
- const candidates=cfg.initialInfectionMode==='child_at_home'?P.filter(p=>p.age==='child'):P;const seeds=shuffle([...candidates],rand);function infect(target,day,source,layer,place=null,hours=null){if(target.state!=='S')return false;target.state='E';target.infectedDay=day;target.onsetDay=day+cfg.latentDays;target.infectiousStartDay=Math.max(day,target.onsetDay-(cfg.preSymptomaticDays??0));target.outcomeDay=target.onsetDay+cfg.infectiousDays;target.source=source;target.symptomatic=null;target.symptomOnsetProcessed=false;events.push({day,type:'infection',person:target.id,source,layer,place:place??target.home,contactHours:hours});transmissionByLayer[layer]=(transmissionByLayer[layer]||0)+1;return true;}
- for(let n=0;n<Math.min(cfg.initialInfections,seeds.length);n++)infect(seeds[n],0,null,'seed');let alerted=false,consecutiveAlertWindows=0,totalDoses=0,deniedPeople=new Set();
+ const seedRegion=Number.isInteger(cfg.initialSeedRegion)?Math.max(0,Math.min(cfg.regions-1,cfg.initialSeedRegion)):null;
+ const seedContext=cfg.initialSeedContext??(cfg.initialInfectionMode==='child_at_home'?'home':'random');
+ function seedPlaceFor(person){
+  const r=seedRegion??person.region;
+  if(seedContext==='school')return city.schools[r];
+  if(seedContext==='work')return city.workplaces[r];
+  if(seedContext==='retail')return city.markets[r];
+  if(seedContext==='community')return city.parks[r];
+  if(seedContext==='hospital')return city.hospitals[r];
+  return person.home;
+ }
+ let candidates=P;
+ if(seedRegion!==null)candidates=candidates.filter(p=>p.region===seedRegion);
+ if(seedContext==='school')candidates=candidates.filter(p=>p.school===city.schools[seedRegion??p.region]||p.teacher);
+ else if(seedContext==='work')candidates=candidates.filter(p=>p.working&&!p.healthWorker&&!p.teacher);
+ else if(seedContext==='hospital')candidates=candidates.filter(p=>p.healthWorker);
+ else if(cfg.initialInfectionMode==='child_at_home')candidates=candidates.filter(p=>p.age==='child');
+ if(!candidates.length)candidates=seedRegion===null?P:P.filter(p=>p.region===seedRegion);
+ if(!candidates.length)candidates=P;
+ const seeds=shuffle([...candidates],rand);function infect(target,day,source,layer,place=null,hours=null){if(target.state!=='S')return false;target.state='E';target.infectedDay=day;target.onsetDay=day+cfg.latentDays;target.infectiousStartDay=Math.max(day,target.onsetDay-(cfg.preSymptomaticDays??0));target.outcomeDay=target.onsetDay+cfg.infectiousDays;target.source=source;target.symptomatic=null;target.symptomOnsetProcessed=false;events.push({day,type:'infection',person:target.id,source,layer,place:place??target.home,contactHours:hours});transmissionByLayer[layer]=(transmissionByLayer[layer]||0)+1;return true;}
+ for(let n=0;n<Math.min(cfg.initialInfections,seeds.length);n++)infect(seeds[n],0,null,'seed',seedPlaceFor(seeds[n]));let alerted=false,consecutiveAlertWindows=0,totalDoses=0,deniedPeople=new Set();
  for(let day=0;day<cfg.days;day++){
   let newInfections=0,newReports=0,newAdmissions=0,newDeaths=0,dosesToday=0,requestedBeds=0;const vaccine=cfg.vaccination;
   if(vaccine.enabled&&day>=vaccine.availableDay&&vaccine.dosesPerDay>0){let v=P.filter(p=>p.state==='S'&&p.vaccinatedDay===null&&p.vaccineWilling<vaccine.uptakeProbability);if(vaccine.priority==='older_first')v.sort((a,b)=>AGE_INDEX[b.age]-AGE_INDEX[a.age]||a.id-b.id);else shuffle(v,rand);for(const p of v.slice(0,Math.floor(vaccine.dosesPerDay))){p.vaccinatedDay=day;dosesToday++;events.push({day,type:'vaccination',person:p.id});}totalDoses+=dosesToday;}
