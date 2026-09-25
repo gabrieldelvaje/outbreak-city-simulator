@@ -2722,6 +2722,25 @@
       "hospital_external_region_probability": 0.5,
       "status": "CITY_NETWORK_GAME_ASSUMPTION_NOT_ESTIMATED_FROM_SUPPLIED_DATA",
       "explanation": "Probabilities control whether a persistent destination is selected outside the agent home district. They are used to keep the fictional city epidemiologically connected. Exact origin-destination shares are not identified by the supplied datasets and should be replaced if a compatible commuting/mobility OD source is calibrated."
+    },
+    "reinfection_wave_scenarios": {
+      "status": "GAME_ASSUMPTION_NOT_IDENTIFIED_BY_SUPPLIED_DATA",
+      "explanation": "The supplied surveillance/contact datasets do not identify duration of sterilizing natural immunity or the frequency of successful introductions from outside the fictional city. These values are explicit game scenarios used to allow recurrent waves and reinfection. The SIVEP COVID reinfection criterion is not interpreted as an immunity duration.",
+      "influenza": {
+        "natural_immunity_days_min": 60,
+        "natural_immunity_days_max": 100,
+        "external_importation_attempts_per_1000_per_day": 0.02
+      },
+      "covid19": {
+        "natural_immunity_days_min": 75,
+        "natural_immunity_days_max": 120,
+        "external_importation_attempts_per_1000_per_day": 0.015
+      },
+      "rsv": {
+        "natural_immunity_days_min": 45,
+        "natural_immunity_days_max": 90,
+        "external_importation_attempts_per_1000_per_day": 0.02
+      }
     }
   },
   "calibration_notes": {
@@ -2731,6 +2750,7 @@
     "cnes_capacity": "CNES values are registered beds in competence 202512, not real-time free beds. Engine capacity is a reference scenario and must be overridable.",
     "polymod": "POLYMOD supplies contact-duration distribution shape only; Brazil contact frequencies and age mixing come from the supplied Prem 2021 matrices.",
     "pnad": "PNAD-COVID weights V1032 are used for population estimates. Social-distancing and remote-work measures are observed behavior indicators, not causal intervention efficacy.",
-    "city_mixing": "The V0.4 city network intentionally mixes residents across districts through persistent work, school, retail, leisure and hospital destinations. The mixing shares are explicit game-network assumptions, not empirical Brazil or Piracicaba OD estimates."
+    "city_mixing": "The V0.4 city network intentionally mixes residents across districts through persistent work, school, retail, leisure and hospital destinations. The mixing shares are explicit game-network assumptions, not empirical Brazil or Piracicaba OD estimates.",
+    "reinfection_waves": "Recovered agents temporarily enter R and later return to S according to pathogen-specific game-scenario windows. External introductions are modeled as exposure attempts scaled by population; vaccine protection can block a successful imported infection. These settings are scenario mechanics, not estimates from WHO/SIVEP/OxCGRT/PNAD/POLYMOD."
   }
 }
