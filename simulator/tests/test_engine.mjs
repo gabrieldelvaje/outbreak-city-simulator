@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {MODEL_VERSION,configFromProfile,makeCity,simulate,summarizeRuns} from '../engine.mjs';
 const params=JSON.parse(fs.readFileSync(new URL('../data/calibrated_parameters_v2.json',import.meta.url),'utf8'));
-assert.equal(MODEL_VERSION,'2.0.0-data-informed');
+assert.equal(MODEL_VERSION,'2.1.0-spatial-routines');
 const base=configFromProfile(params,'medium',{population:600,days:45,seed:1234,pathogenId:'influenza'});
 assert.equal(base.population,600); assert.equal(base.crossRegionWorkProbability,0); assert.equal(base.hospitalContactScale,0);
 assert.ok(Array.isArray(base.contactMatrices.home));
@@ -14,6 +14,39 @@ const anchoredSeed=anchored.events.find(e=>e.type==='infection'&&e.layer==='seed
 const anchoredPlace=new Map(anchored.city.places.map(p=>[p.id,p])).get(anchoredSeed.place);
 assert.equal(anchoredPlace.region,3,'patient zero must start in the selected map region');
 assert.equal(anchoredPlace.type,'school','patient zero school focus must seed the school layer');
+
+const spatialModel={
+  homes:[
+    {id:'casa-a',regionIndex:0},{id:'casa-b',regionIndex:0},
+    {id:'casa-c',regionIndex:1},{id:'casa-d',regionIndex:1}
+  ],
+  places:[
+    {id:'escola-a',type:'school',regionIndex:0,capacity:200},
+    {id:'empresa-a',type:'office',regionIndex:0,capacity:200},
+    {id:'mercado-a',type:'market',regionIndex:0,capacity:100},
+    {id:'parque-a',type:'park',regionIndex:0,capacity:100},
+    {id:'hospital-a',type:'hospital',regionIndex:0,capacity:100},
+    {id:'escola-b',type:'school',regionIndex:1,capacity:200},
+    {id:'empresa-b',type:'office',regionIndex:1,capacity:200},
+    {id:'mercado-b',type:'market',regionIndex:1,capacity:100},
+    {id:'parque-b',type:'park',regionIndex:1,capacity:100},
+    {id:'hospital-b',type:'hospital',regionIndex:1,capacity:100}
+  ]
+};
+const spatialCfg=configFromProfile(params,'high',{population:240,days:18,seed:5150,pathogenId:'influenza',regions:2,spatialModel});
+const spatialCity=makeCity(spatialCfg);
+assert.ok(spatialCity.agents.every(p=>['casa-a','casa-b','casa-c','casa-d'].includes(p.visualHome)),'every agent must have a persistent visual residence');
+assert.ok(spatialCity.agents.every(p=>p.householdId&&p.home===p.householdId),'households must remain distinct from visual residential nodes');
+const chosen=spatialCity.agents.find(p=>p.school)||spatialCity.agents[0];
+const chosenPlace=chosen.school??chosen.home;
+const exactSeed=simulate({...spatialCfg,initialSeedAgentId:chosen.id,initialSeedRegion:chosen.region,initialSeedContext:chosen.school?'school':'home',initialSeedPlaceId:chosen.school??chosen.visualHome});
+const exactSeedEvent=exactSeed.events.find(e=>e.type==='infection'&&e.layer==='seed');
+assert.equal(exactSeedEvent.person,chosen.id,'selected resident must be the exact patient zero');
+assert.equal(exactSeedEvent.visualPlace,chosen.school??chosen.visualHome,'patient zero must be rendered at the selected visual node');
+for(const e of exactSeed.events.filter(e=>e.type==='infection'&&e.layer!=='seed'&&e.layer!=='external_importation')){
+  assert.ok(['home_morning','daytime','evening_outing','home_night'].includes(e.block),'secondary transmission must occur inside an explicit daily routine block');
+  assert.ok(e.visualPlace,'secondary transmission must resolve to a visual map location');
+}
 const r1=simulate(base),r2=simulate(base);
 assert.deepEqual(r1.daily,r2.daily,'same seed must be reproducible');
 for(const d of r1.daily) assert.equal(d.S+d.E+d.I+d.H+d.R+d.D,600,'population must be conserved');
