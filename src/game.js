@@ -1,4 +1,5 @@
 import {districts,places} from './city-data.js';
+import {buildDecisionCheckpoints,nextDecisionCheckpoint} from './decision-checkpoints.js';
 
 const $=id=>document.getElementById(id);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -24,8 +25,9 @@ const state={
   vaccination:null,
   nodeEvents:[],
   decisions:[],
-  alertAcknowledged:false,
-  alertPauseDay:null
+  decisionCheckpoints:[],
+  acknowledgedCheckpoints:new Set(),
+  currentDecisionCheckpoint:null
 };
 
 const worker=new Worker(new URL('./simulation-worker.js',import.meta.url),{type:'module'});
@@ -164,8 +166,9 @@ function clearPreparedPopulation(){
   state.interventions=[];
   state.vaccination=null;
   state.decisions=[];
-  state.alertAcknowledged=false;
-  state.alertPauseDay=null;
+  state.decisionCheckpoints=[];
+  state.acknowledgedCheckpoints=new Set();
+  state.currentDecisionCheckpoint=null;
   state.phase='setup';
   clearSeedSelection();
   clearHeat();
@@ -481,12 +484,19 @@ worker.onmessage=event=>{
   if(data.type!=='result')return;
   state.result=data.result;
   buildNodeEvents();
+  state.decisionCheckpoints=buildDecisionCheckpoints(state.result,{districtCount:districts.length});
+  for(const checkpoint of state.decisionCheckpoints){
+    if(checkpoint.day<state.resumeDay)state.acknowledgedCheckpoints.add(checkpoint.id);
+  }
+  state.currentDecisionCheckpoint=null;
   state.currentDay=clamp(state.resumeDay,0,state.result.daily.length-1);
   state.phase='paused';
   setBusy(false);playButton.disabled=false;stepButton.disabled=false;
   renderDay(state.currentDay);
-  announce(`Motor ${data.result.modelVersion} · paciente zero: ${state.selected.label}.`,'ok');
-  if(state.autoplay)play();
+  if(state.phase!=='awaiting-decision'){
+    announce(`Motor ${data.result.modelVersion} · paciente zero: ${state.selected.label}.`,'ok');
+    if(state.autoplay)play();
+  }
 };
 
 function nodeFromVisualId(id){
@@ -524,11 +534,34 @@ function renderHeat(day){
   seedNode?.classList.add('game-seed-target');
 }
 
+function acknowledgeDecisionCheckpoint(){
+  const current=state.currentDecisionCheckpoint;
+  if(!current)return null;
+  for(const checkpoint of state.decisionCheckpoints){
+    if(checkpoint.day<=state.currentDay)state.acknowledgedCheckpoints.add(checkpoint.id);
+  }
+  state.currentDecisionCheckpoint=null;
+  return current;
+}
+
+function enterDecisionCheckpoint(checkpoint,d){
+  if(state.timer){clearInterval(state.timer);state.timer=null;}
+  state.currentDecisionCheckpoint=checkpoint;
+  state.phase='awaiting-decision';
+  playButton.disabled=true;
+  stepButton.disabled=true;
+  alertBox.classList.add('active');
+  alertBox.dataset.severity=String(checkpoint.severity??1);
+  alertText.textContent=`${checkpoint.title} · ${checkpoint.message} Escolha uma medida ou “Continuar sem ação”.`;
+  unlockDecisions(true,true);
+  announce(`${checkpoint.title}. A linha do tempo foi pausada para uma nova decisão.`,'error');
+}
+
 function renderDay(day){
   if(!state.result)return;
   let targetDay=clamp(day,0,state.result.daily.length-1);
-  const firstAlert=state.result.summary.alertDay;
-  if(!state.alertAcknowledged&&Number.isInteger(firstAlert)&&targetDay>=firstAlert)targetDay=firstAlert;
+  const pending=nextDecisionCheckpoint(state.decisionCheckpoints,state.acknowledgedCheckpoints,targetDay);
+  if(pending)targetDay=pending.day;
   state.currentDay=targetDay;
   const d=state.result.daily[state.currentDay];
   $('game-day').textContent='Dia '+d.day;
@@ -544,28 +577,28 @@ function renderDay(day){
   $('game-progress').style.width=(state.currentDay/(state.result.daily.length-1)*100)+'%';
   $('game-progress').parentElement.setAttribute('aria-valuenow',String(state.currentDay));
   renderHeat(state.currentDay);
-  if(d.gameAlert){
+
+  const due=nextDecisionCheckpoint(state.decisionCheckpoints,state.acknowledgedCheckpoints,state.currentDay);
+  if(due&&due.day===state.currentDay){
+    enterDecisionCheckpoint(due,d);
+  }else if(d.gameAlert){
+    state.currentDecisionCheckpoint=null;
     alertBox.classList.add('active');
-    const first=state.result.summary.alertDay;
-    alertText.textContent=`Alerta de epidemia simulada · detectado no dia ${first}. Admissões recentes: ${nfmt(d.alertMetric)} · limite esperado: ${nfmt(d.alertThreshold)}.`;
-    unlockDecisions(true);
-    if(!state.alertAcknowledged&&state.currentDay===first){
-      if(state.timer){clearInterval(state.timer);state.timer=null;}
-      state.phase='awaiting-decision';
-      state.alertPauseDay=first;
-      playButton.disabled=true;
-      stepButton.disabled=true;
-      announce('O hospital decretou alerta de epidemia. Escolha uma ação ou “Continuar sem ação” para liberar o tempo.','error');
-    }
+    delete alertBox.dataset.severity;
+    const occupancy=d.bedCapacity>0?Math.round(d.bedsOccupied/d.bedCapacity*100):0;
+    alertText.textContent=`Epidemia em acompanhamento · ${nfmt(d.E+d.I+d.H)} casos ativos · ocupação hospitalar ${occupancy}% · ${reached} de ${districts.length} bairros atingidos.`;
+    unlockDecisions(true,false);
   }else{
+    state.currentDecisionCheckpoint=null;
     alertBox.classList.remove('active');
+    delete alertBox.dataset.severity;
     alertText.textContent='Vigilância hospitalar ainda abaixo do limiar de alerta.';
-    unlockDecisions(false);
+    unlockDecisions(false,false);
   }
+
   $('game-status').textContent=state.phase==='awaiting-decision'?'Decisão necessária':state.phase==='running'?'Simulação em curso':state.currentDay>=state.result.daily.length-1?'Fim do horizonte':'Simulação pausada';
   playButton.textContent=state.phase==='running'?'Pausar':'Continuar';
 }
-
 function play(){
   if(!state.result||state.phase==='awaiting-decision')return;
   pause();state.phase='running';renderDay(state.currentDay);
@@ -586,7 +619,7 @@ function resetGame(){
   pause();
   state.phase='setup';state.population=null;state.populationIndexes=null;state.spatialModel=null;
   state.selected=null;state.result=null;state.currentDay=0;state.interventions=[];state.vaccination=null;
-  state.decisions=[];state.nodeEvents=[];state.alertAcknowledged=false;state.alertPauseDay=null;
+  state.decisions=[];state.nodeEvents=[];state.decisionCheckpoints=[];state.acknowledgedCheckpoints=new Set();state.currentDecisionCheckpoint=null;
   clearHeat();clearSeedSelection();clearPopulationDecorations();
   populationRange.disabled=false;populationNumber.disabled=false;prepareButton.disabled=false;
   prepareButton.textContent='Distribuir população';
@@ -610,8 +643,11 @@ const ACTIONS={
   retail:{label:'Restringir comércio',intervention:{type:'retail_limit',fraction:1}},
   lockdown:{label:'Lockdown',intervention:{type:'lockdown',fraction:1}}
 };
-function unlockDecisions(unlocked){
-  for(const button of decisionsRoot.querySelectorAll('button[data-action]'))button.disabled=!unlocked||button.dataset.applied==='true';
+function unlockDecisions(unlocked,allowNoAction=false){
+  for(const button of decisionsRoot.querySelectorAll('button[data-action]')){
+    if(button.dataset.action==='none')button.disabled=!allowNoAction;
+    else button.disabled=!unlocked||button.dataset.applied==='true';
+  }
 }
 function addDecisionLog(label,day){
   const item=document.createElement('li');item.textContent=`Dia ${day}: ${label}`;decisionLog.prepend(item);
@@ -620,18 +656,18 @@ decisionsRoot.addEventListener('click',event=>{
   const button=event.target.closest('button[data-action]');
   if(!button||button.disabled||!state.result)return;
   const action=button.dataset.action,startDay=Math.min(state.currentDay+1,state.result.daily.length-1);
+  const checkpoint=acknowledgeDecisionCheckpoint();
   if(action==='none'){
-    state.alertAcknowledged=true;
-    button.dataset.applied='true';
-    state.decisions.push({day:state.currentDay,label:'Continuar sem ação'});
-    addDecisionLog('Continuar sem ação',state.currentDay);
+    const context=checkpoint?.title?` — ${checkpoint.title}`:'';
+    state.decisions.push({day:state.currentDay,label:'Continuar sem ação'+context});
+    addDecisionLog('Continuar sem ação'+context,state.currentDay);
     state.phase='paused';
     playButton.disabled=false;stepButton.disabled=false;
-    announce('Nenhuma medida adotada. A linha do tempo foi liberada.','ok');
+    unlockDecisions(Boolean(state.result.daily[state.currentDay]?.gameAlert),false);
+    announce('Nenhuma nova medida adotada. A linha do tempo foi liberada.','ok');
     play();
     return;
   }
-  state.alertAcknowledged=true;
   if(action==='vaccine'){
     state.vaccination={
       enabled:true,availableDay:startDay,dosesPerDay:Math.max(5,Math.round(Number(populationNumber.value)*.01)),
