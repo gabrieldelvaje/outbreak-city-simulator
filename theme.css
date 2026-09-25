@@ -34,7 +34,7 @@ html[data-theme="dark"] #map-world [fill="#dceacb"]{fill:#173b40!important} /* s
 html[data-theme="dark"] #map-world [fill="#fff87b"]{fill:#2b384b!important} /* riverbanks */
 html[data-theme="dark"] #map-world [fill="#74cbec"]{fill:#0b2138!important} /* river */
 html[data-theme="dark"] #map-world [fill="#a0dd3c"]{fill:#205047!important} /* parks */
-html[data-theme="dark"] #map-world [fill="#f8f8f8"]{fill:#36485f!important} /* local streets */
+html[data-theme="dark"] #map-world [fill="#f8f8f8"]{fill:#50627a!important} /* local streets: fill matches the existing edge color */
 html[data-theme="dark"] #map-world [fill="#f4ba3e"]{fill:#6b829e!important} /* main roads */
 html[data-theme="dark"] #map-world [fill="#c1c1c1"]{fill:#37475e!important} /* roofs */
 html[data-theme="dark"] #map-world [stroke="#f8f8f8"]{stroke:#50627a!important} /* residential road outlines */
