@@ -11,29 +11,45 @@ const make=(tag,attributes,parent)=>{
 };
 const toWorld=(x,y)=>({x:MAP.x+MAP.scale*x,y:MAP.y+MAP.scale*y});
 
-// All coordinates are in the original 740 x 740 reference space.
-//
-// The peninsula is split by a diagonal local street. New homes stay inside the
-// western block and follow the same diagonal direction as the surrounding roads.
-// The shopping occupies the separate eastern block, completely clear of the
-// diagonal street and the riverside road.
-const shoppingLot={cx:332,cy:443,width:30,height:21,angle:-8};
-
-// A compact 3 x 3 residential pattern. These are deliberately inset from every
-// street edge so neither roofs nor graph nodes sit on top of a roadway.
-const residentialLots=[
-  {cx:240,cy:423,width:12,height:8,angle:18},
-  {cx:258,cy:429,width:12,height:8,angle:18},
-  {cx:276,cy:435,width:12,height:8,angle:18},
-
-  {cx:235,cy:441,width:12,height:8,angle:18},
-  {cx:253,cy:447,width:12,height:8,angle:18},
-  {cx:271,cy:453,width:12,height:8,angle:18},
-
-  {cx:230,cy:459,width:12,height:8,angle:18},
-  {cx:248,cy:465,width:12,height:8,angle:18},
-  {cx:266,cy:471,width:12,height:8,angle:18}
+// Controlled infill zones in the original 740 x 740 map-reference space.
+// We clear only graph nodes inside these two empty-block areas, then rebuild them
+// in an orderly pattern so no residence or commercial building sits on a road.
+const residentialZone=[
+  [198,405],[284,428],[279,472],[246,482],[205,466],[190,435]
 ];
+const shoppingZone=[
+  [304,426],[344,430],[349,463],[336,474],[306,470],[298,442]
+];
+
+// Residential lots form a consistent diagonal grid parallel to the surrounding
+// local streets. Every roof uses the same base-map roof color (#c1c1c1).
+const residentialLots=[
+  {cx:218,cy:418,width:12,height:8,angle:18},
+  {cx:239,cy:425,width:12,height:8,angle:18},
+  {cx:260,cy:432,width:12,height:8,angle:18},
+
+  {cx:213,cy:437,width:12,height:8,angle:18},
+  {cx:234,cy:444,width:12,height:8,angle:18},
+  {cx:255,cy:451,width:12,height:8,angle:18},
+
+  {cx:208,cy:456,width:12,height:8,angle:18},
+  {cx:229,cy:463,width:12,height:8,angle:18},
+  {cx:250,cy:470,width:12,height:8,angle:18}
+];
+
+// Shopping is intentionally compact and inset from all four sides of the eastern
+// block, including the diagonal street on the left and the riverside street below.
+const shoppingLot={cx:325,cy:449,width:22,height:16,angle:-7};
+
+function insidePolygon(x,y,polygon){
+  let inside=false;
+  for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){
+    const [xi,yi]=polygon[i],[xj,yj]=polygon[j];
+    const crosses=(yi>y)!==(yj>y);
+    if(crosses && x<(xj-xi)*(y-yi)/(yj-yi)+xi)inside=!inside;
+  }
+  return inside;
+}
 
 function homeAt(homes,x,y,serial){
   const node=make('g',{
@@ -56,6 +72,27 @@ function lotRect(parent,{cx,cy,width,height,angle},attrs={}){
   },parent);
 }
 
+function homeCenter(node){
+  const dot=node.querySelector('circle');
+  if(!dot)return null;
+  const x=Number(dot.getAttribute('cx'));
+  const y=Number(dot.getAttribute('cy'));
+  return Number.isFinite(x)&&Number.isFinite(y)?{x,y}:null;
+}
+
+function clearControlledBlocks(homes){
+  for(const home of [...homes.querySelectorAll('.home-node')]){
+    const point=homeCenter(home);
+    if(!point)continue;
+    if(
+      insidePolygon(point.x,point.y,residentialZone) ||
+      insidePolygon(point.x,point.y,shoppingZone)
+    ){
+      home.remove();
+    }
+  }
+}
+
 function run(){
   const frame=document.getElementById('reference-city');
   const homes=frame?.querySelector('#homes-layer');
@@ -66,14 +103,16 @@ function run(){
   if(!frame||!homes||!shops||!shopping||!oldRoof||!pin)return false;
   if(frame.querySelector('#peninsula-infill-roofs'))return true;
 
-  // The previous shopping occupied a genuine old roof. Remove ONLY the added
-  // commercial tint; the original gray reference roof remains underneath it.
-  // Its former commercial node becomes residential again.
+  // The former shopping used a genuine old roof. Remove only the added business
+  // tint so the original gray roof remains visible underneath.
   const oldBox=oldRoof.getBBox();
   const previous={x:oldBox.x+oldBox.width/2,y:oldBox.y+oldBox.height/2};
   oldRoof.remove();
 
-  // Put the synthetic roof layer behind graph nodes and place pins.
+  // peninsula-center.js may have scattered extra homes through these empty blocks.
+  // Remove those first, then recreate a deliberate block-aligned street grid.
+  clearControlledBlocks(homes);
+
   const roofs=make('g',{
     id:'peninsula-infill-roofs',
     'aria-label':'Novos lotes residenciais e comerciais do Centro'
@@ -83,37 +122,36 @@ function run(){
   let serial=Math.max(0,...[...homes.querySelectorAll('[data-home]')]
     .map(node=>Number(node.dataset.home.replace('casa-',''))||0));
 
-  const occupied=[...homes.querySelectorAll('.home-node')].map(node=>{
-    const dot=node.querySelector('circle');
-    return dot?{x:Number(dot.getAttribute('cx')),y:Number(dot.getAttribute('cy'))}:null;
-  }).filter(Boolean);
+  const occupied=[...homes.querySelectorAll('.home-node')]
+    .map(homeCenter)
+    .filter(Boolean);
 
-  // Restore a home in the shopping's OLD building, without duplicating a dot.
-  if(!occupied.some(p=>Math.hypot(p.x-previous.x,p.y-previous.y)<7)){
+  // The old shopping building returns to residential use only when it is outside
+  // the two controlled infill blocks and no home already occupies that roof.
+  if(
+    !insidePolygon(previous.x,previous.y,residentialZone) &&
+    !insidePolygon(previous.x,previous.y,shoppingZone) &&
+    !occupied.some(p=>Math.hypot(p.x-previous.x,p.y-previous.y)<7)
+  ){
     serial++;
     homeAt(homes,previous.x,previous.y,serial);
     occupied.push(previous);
   }
 
-  // Residential roofs now match the exact base-map building color and have no
-  // artificial white outline. Their common rotation follows the block/street grid.
+  // Rebuild the western block as a clean 3 x 3 residential grid.
   for(const lot of residentialLots){
     const {cx,cy}=lot;
-    if(occupied.some(p=>Math.hypot(p.x-cx,p.y-cy)<8))continue;
-
     lotRect(roofs,lot,{
       fill:'#c1c1c1',
       stroke:'none',
       'pointer-events':'none'
     });
-
     serial++;
     homeAt(homes,cx,cy,serial);
     occupied.push({x:cx,y:cy});
   }
 
-  // Dedicated shopping building, fully inside the eastern block. The footprint
-  // is smaller and rotated with the street instead of crossing either roadway.
+  // Build the shopping fully inside the eastern block, clear of every road.
   const {cx,cy}=shoppingLot;
   const roof=lotRect(shopping,shoppingLot,{
     fill:'#c1c1c1',
@@ -124,8 +162,8 @@ function run(){
 
   const tint=lotRect(shopping,{
     ...shoppingLot,
-    width:shoppingLot.width-2.2,
-    height:shoppingLot.height-2.2
+    width:shoppingLot.width-2,
+    height:shoppingLot.height-2
   },{
     fill:'#8a76c8',
     'fill-opacity':.52,
@@ -145,14 +183,14 @@ function run(){
   if(record){
     Object.assign(record,toWorld(cx,cy),{
       region:'centro-civico',
-      description:'Shopping instalado inteiramente no quarteirão comercial da península central, sem sobrepor as vias.'
+      description:'Shopping inteiramente contido no quarteirão comercial da península central, sem sobreposição com as vias.'
     });
   }
   return true;
 }
 
-// peninsula-center.js fetches the source map asynchronously. Run once its
-// shopping marker and original roof exist, regardless of network timing.
+// peninsula-center.js creates the downtown asynchronously. Apply this correction
+// only after its shopping marker exists, so this file becomes the final layout pass.
 if(!run()){
   const world=document.getElementById('map-world');
   if(world){
