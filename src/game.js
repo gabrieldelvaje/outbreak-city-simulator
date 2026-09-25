@@ -23,7 +23,9 @@ const state={
   interventions:[],
   vaccination:null,
   nodeEvents:[],
-  decisions:[]
+  decisions:[],
+  alertAcknowledged:false,
+  alertPauseDay:null
 };
 
 const worker=new Worker(new URL('./simulation-worker.js',import.meta.url),{type:'module'});
@@ -162,6 +164,8 @@ function clearPreparedPopulation(){
   state.interventions=[];
   state.vaccination=null;
   state.decisions=[];
+  state.alertAcknowledged=false;
+  state.alertPauseDay=null;
   state.phase='setup';
   clearSeedSelection();
   clearHeat();
@@ -522,7 +526,10 @@ function renderHeat(day){
 
 function renderDay(day){
   if(!state.result)return;
-  state.currentDay=clamp(day,0,state.result.daily.length-1);
+  let targetDay=clamp(day,0,state.result.daily.length-1);
+  const firstAlert=state.result.summary.alertDay;
+  if(!state.alertAcknowledged&&Number.isInteger(firstAlert)&&targetDay>=firstAlert)targetDay=firstAlert;
+  state.currentDay=targetDay;
   const d=state.result.daily[state.currentDay];
   $('game-day').textContent='Dia '+d.day;
   $('game-active').textContent=nfmt(d.E+d.I+d.H);
@@ -542,17 +549,25 @@ function renderDay(day){
     const first=state.result.summary.alertDay;
     alertText.textContent=`Alerta de epidemia simulada · detectado no dia ${first}. Admissões recentes: ${nfmt(d.alertMetric)} · limite esperado: ${nfmt(d.alertThreshold)}.`;
     unlockDecisions(true);
+    if(!state.alertAcknowledged&&state.currentDay===first){
+      if(state.timer){clearInterval(state.timer);state.timer=null;}
+      state.phase='awaiting-decision';
+      state.alertPauseDay=first;
+      playButton.disabled=true;
+      stepButton.disabled=true;
+      announce('O hospital decretou alerta de epidemia. Escolha uma ação ou “Continuar sem ação” para liberar o tempo.','error');
+    }
   }else{
     alertBox.classList.remove('active');
     alertText.textContent='Vigilância hospitalar ainda abaixo do limiar de alerta.';
     unlockDecisions(false);
   }
-  $('game-status').textContent=state.phase==='running'?'Simulação em curso':state.currentDay>=state.result.daily.length-1?'Fim do horizonte':'Simulação pausada';
+  $('game-status').textContent=state.phase==='awaiting-decision'?'Decisão necessária':state.phase==='running'?'Simulação em curso':state.currentDay>=state.result.daily.length-1?'Fim do horizonte':'Simulação pausada';
   playButton.textContent=state.phase==='running'?'Pausar':'Continuar';
 }
 
 function play(){
-  if(!state.result)return;
+  if(!state.result||state.phase==='awaiting-decision')return;
   pause();state.phase='running';renderDay(state.currentDay);
   state.timer=setInterval(()=>{
     if(state.currentDay>=state.result.daily.length-1){pause();state.phase='ended';renderDay(state.currentDay);return;}
@@ -564,14 +579,14 @@ function pause(){
   if(state.result&&state.phase!=='ended')state.phase='paused';
 }
 playButton.addEventListener('click',()=>state.phase==='running'?pause():play());
-stepButton.addEventListener('click',()=>{pause();if(state.result)renderDay(state.currentDay+1);});
+stepButton.addEventListener('click',()=>{if(state.phase==='awaiting-decision')return;pause();if(state.result)renderDay(state.currentDay+1);});
 speedSelect.addEventListener('change',()=>{state.speed=Number(speedSelect.value);if(state.phase==='running')play();});
 
 function resetGame(){
   pause();
   state.phase='setup';state.population=null;state.populationIndexes=null;state.spatialModel=null;
   state.selected=null;state.result=null;state.currentDay=0;state.interventions=[];state.vaccination=null;
-  state.decisions=[];state.nodeEvents=[];
+  state.decisions=[];state.nodeEvents=[];state.alertAcknowledged=false;state.alertPauseDay=null;
   clearHeat();clearSeedSelection();clearPopulationDecorations();
   populationRange.disabled=false;populationNumber.disabled=false;prepareButton.disabled=false;
   prepareButton.textContent='Distribuir população';
@@ -605,6 +620,18 @@ decisionsRoot.addEventListener('click',event=>{
   const button=event.target.closest('button[data-action]');
   if(!button||button.disabled||!state.result)return;
   const action=button.dataset.action,startDay=Math.min(state.currentDay+1,state.result.daily.length-1);
+  if(action==='none'){
+    state.alertAcknowledged=true;
+    button.dataset.applied='true';
+    state.decisions.push({day:state.currentDay,label:'Continuar sem ação'});
+    addDecisionLog('Continuar sem ação',state.currentDay);
+    state.phase='paused';
+    playButton.disabled=false;stepButton.disabled=false;
+    announce('Nenhuma medida adotada. A linha do tempo foi liberada.','ok');
+    play();
+    return;
+  }
+  state.alertAcknowledged=true;
   if(action==='vaccine'){
     state.vaccination={
       enabled:true,availableDay:startDay,dosesPerDay:Math.max(5,Math.round(Number(populationNumber.value)*.01)),
@@ -617,7 +644,7 @@ decisionsRoot.addEventListener('click',event=>{
     button.dataset.applied='true';state.decisions.push({day:startDay,label:spec.label});addDecisionLog(spec.label,startDay);
   }
   announce('Decisão aplicada a partir do próximo dia. Recalculando com a mesma população e paciente zero…','busy');
-  runSimulation({resumeDay:state.currentDay,autoplay:false});
+  runSimulation({resumeDay:state.currentDay,autoplay:true});
 });
 function resetAppliedButtons(){for(const button of decisionsRoot.querySelectorAll('button[data-action]'))delete button.dataset.applied;}
 
