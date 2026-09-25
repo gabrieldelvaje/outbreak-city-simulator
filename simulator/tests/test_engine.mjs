@@ -2,8 +2,10 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {MODEL_VERSION,configFromProfile,makeCity,simulate,summarizeRuns} from '../engine.mjs';
 const params=JSON.parse(fs.readFileSync(new URL('../data/calibrated_parameters_v2.json',import.meta.url),'utf8'));
-assert.equal(MODEL_VERSION,'2.3.0-reinfection-waves');
+assert.equal(MODEL_VERSION,'2.4.0-year-waves');
 const base=configFromProfile(params,'medium',{population:600,days:45,seed:1234,pathogenId:'influenza'});
+const annual=configFromProfile(params,'high',{population:600,seed:1234,pathogenId:'influenza'});
+assert.equal(annual.days,360,'playable annual profile must cover 360 days');
 assert.equal(base.population,600); assert.ok(base.cityMixing.workExternalRegionProbability>0); assert.ok(base.cityMixing.retailExternalRegionProbability>0); assert.equal(base.hospitalContactScale,0);
 assert.ok(Array.isArray(base.contactMatrices.home));
 const city=makeCity(base); assert.equal(city.agents.length,600);
@@ -102,9 +104,26 @@ const vaccinatedWave=simulate({...waveBase,vaccination:{
 assert.ok(vaccinatedWave.summary.reinfections<recurrent.summary.reinfections,'protective vaccination must reduce successful reinfections/reintroductions in the scenario');
 const cases=simulate({...base,seed:7,symptomaticProbability:1,severeProbabilityByAge:{child:1,adult:1,older:1},beds:600,beta:0,initialInfections:20,days:40});
 assert.ok(cases.summary.hospitalAdmissions>0,'severe symptomatic cases should reach hospital using empirical delay PMFs');
-const maxPopulationCfg=configFromProfile(params,'low',{population:30000,days:1,seed:9090,pathogenId:'influenza',regions:2,spatialModel});
+const doseScenario=simulate(configFromProfile(params,'high',{
+  population:60,regions:2,days:40,seed:606,pathogenId:'influenza',initialInfections:0,externalImportationRatePerDay:0,
+  vaccinationCampaigns:[
+    {doseNumber:1,availableDay:0,dosesPerDay:60,uptakeProbability:1,daysToProtection:0,infectionProtectionFraction:.3,severeProtectionFraction:.5,priority:'older_first',minDaysSincePreviousDose:0},
+    {doseNumber:2,availableDay:7,dosesPerDay:60,uptakeProbability:1,daysToProtection:0,infectionProtectionFraction:.6,severeProtectionFraction:.8,priority:'older_first',minDaysSincePreviousDose:7},
+    {doseNumber:3,availableDay:14,dosesPerDay:60,uptakeProbability:1,daysToProtection:0,infectionProtectionFraction:.75,severeProtectionFraction:.9,priority:'older_first',minDaysSincePreviousDose:7}
+  ]
+}));
+assert.ok(doseScenario.daily.at(-1).cumulativeDose1>0,'first-dose campaign must deliver doses');
+assert.ok(doseScenario.daily.at(-1).cumulativeDose2>0,'second-dose campaign must deliver doses after the minimum interval');
+assert.ok(doseScenario.daily.at(-1).cumulativeDose3>0,'third-dose campaign must deliver booster doses');
+const fourWave=simulate({...annual,days:360,initialInfections:0,externalImportationRatePerDay:0,beta:0});
+assert.deepEqual([...new Set(fourWave.daily.map(d=>d.waveNumber))],[1,2,3,4],'360-day campaign must expose four wave phases');
+const lethalClinical={...base.clinicalProfile,death_fraction_given_hospitalized:{child:1,adult:1,older:1}};
+const noBeds=simulate({...base,seed:707,days:55,beta:0,initialInfections:30,latentDays:1,infectiousDays:30,symptomaticProbability:1,severeProbabilityByAge:{child:1,adult:1,older:1},beds:0,clinicalProfile:lethalClinical,externalImportationRatePerDay:0});
+assert.ok(noBeds.summary.uniqueDeniedBed>0,'zero capacity must deny care to severe cases');
+assert.ok(noBeds.summary.unmetCareDeaths>0,'deaths after denied care must be tracked separately');
+const maxPopulationCfg=configFromProfile(params,'low',{population:20000,days:1,seed:9090,pathogenId:'influenza',regions:2,spatialModel});
 const maxPopulationCity=makeCity(maxPopulationCfg);
-assert.equal(maxPopulationCity.agents.length,30000,'maximum configured population must be constructible');
+assert.equal(maxPopulationCity.agents.length,20000,'maximum configured population must be constructible');
 assert.ok(new Set(maxPopulationCity.agents.map(p=>p.householdId)).size>1000,'maximum population must remain split into many persistent households');
 const summary=summarizeRuns([r1,r2]); assert.equal(summary.runs,2);
 console.log('OUTBREAK v2 tests passed', {contacts:base.contactMatrices.home.length, admissions:cases.summary.hospitalAdmissions, alert:cases.summary.alertDay});
