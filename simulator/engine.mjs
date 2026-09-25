@@ -5,7 +5,7 @@
  * effects remain sensitivity assumptions where the supplied data do not identify them.
  * ES module, no runtime dependencies.
  */
-export const MODEL_VERSION='2.0.0-data-informed';
+export const MODEL_VERSION='2.1.0-spatial-routines';
 const AGE_GROUPS=['child','adult','older'];
 const AGE_INDEX={child:0,adult:1,older:2};
 const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
