@@ -74,14 +74,29 @@ function addHomes(parent){let count=0;
  return count;
 }
 function countryside(root){
+ // The city is a long river corridor: keep rural green mainly on the far lateral
+ // edges, while the neutral urban band continues farther north and south.
  R(-240,-210,2080,1350,'#e5e5e5',root);
  const g=E('g',{'aria-hidden':'true','pointer-events':'none'},root);
  const f='#dceacb';
- for(const d of ['M-240 -210H1840V-110L1440 -96 1280 -50 1100 -65 985 -25 630 -95 330 -40 130 -100 -240 -50Z',
- 'M-240 -210L280 -210 230 -60 150 -55 80 50 -80 160 -240 140Z',
- 'M1840 -210V1140H1420L1350 930 1440 770 1510 520 1430 280 1470 -40Z',
- 'M-240 1140V720L-75 670 155 810 330 950 800 975 1120 1110Z'])P(d,f,g);
- for(const d of ['M-210 340Q20 310 360 390','M1280 120Q1470 165 1720 125','M-160 770Q150 720 420 900','M1190 975Q1430 820 1770 870'])L(d,'#f9faf8',5,g);
+
+ // Narrower rural fringe on the west/east makes the settlement feel like it
+ // developed continuously along both river banks instead of sitting in a square.
+ for(const d of [
+  'M-240 -210H1840V-150L1510 -132 1320 -118 1110 -126 910 -112 690 -132 470 -116 240 -138 -240 -112Z',
+  'M-240 -210L105 -210 82 -78 58 65 35 205 18 360 28 520 52 690 92 835 45 980 -240 1010Z',
+  'M1840 -210V1140H1535L1494 990 1520 830 1502 665 1518 500 1495 335 1515 165 1545 -35Z',
+  'M-240 1140V1055L70 1028 310 1046 565 1032 810 1050 1055 1034 1295 1050 1540 1025 1840 1060V1140Z'
+ ])P(d,f,g);
+
+ // Sparse peripheral roads still hint that the urban fabric keeps going beyond
+ // the current detailed map, especially at the north/south ends of both banks.
+ for(const d of [
+  'M-150 285Q95 300 355 360',
+  'M1265 145Q1450 165 1705 135',
+  'M-105 735Q155 710 405 835',
+  'M1180 995Q1435 930 1745 965'
+ ])L(d,'#f9faf8',5,g);
 }
 export function finishLandscape(root){
  root.replaceChildren();countryside(root);
