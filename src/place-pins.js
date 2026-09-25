@@ -5,7 +5,7 @@ import {places,placeColors} from './city-data.js';
 const NS='http://www.w3.org/2000/svg';
 const typeById=new Map(places.map(place=>[place.id,place.type]));
 const placeById=new Map(places.map(place=>[place.id,place]));
-const darkDiscColors={school:'#9bc8f0',market:'#f0bc88',hospital:'#eea0aa',civic:'#b3c7dd',office:'#bcafe3',park:'#acd9b7'};
+const darkDiscColors={school:'#9bc8f0',market:'#f0bc88',restaurant:'#f0bc88',commerce:'#efafd1',hospital:'#eea0aa',civic:'#b3c7dd',office:'#bcafe3',park:'#acd9b7'};
 const svg=(tag,attributes,parent)=>{
   const node=document.createElementNS(NS,tag);
   for(const [name,value] of Object.entries(attributes))node.setAttribute(name,String(value));
@@ -28,6 +28,12 @@ function drawIcon(parent,type){
     shape('M2 3H5L7 15H19L22 7H6');
     svg('circle',{cx:9,cy:20,r:1},icon);
     svg('circle',{cx:18,cy:20,r:1},icon);
+  }else if(type==='restaurant'){
+    shape('M6 3V11M3.5 3V8C3.5 10 5 11 6 11M8.5 3V8C8.5 10 7 11 6 11M6 11V21');
+    shape('M16 3V21M16 3C20 6 20 11 16 13');
+  }else if(type==='commerce'){
+    shape('M5 8H19L18 21H6L5 8Z');
+    shape('M9 8V6C9 4 10.5 3 12 3C13.5 3 15 4 15 6V8');
   }else if(type==='civic'){
     shape('M2 9 12 3 22 9M3 10H21M5 10V19M10 10V19M15 10V19M19 10V19M2 20H22');
   }else if(type==='office'){
