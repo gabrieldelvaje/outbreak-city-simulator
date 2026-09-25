@@ -5,7 +5,7 @@
  * effects remain sensitivity assumptions where the supplied data do not identify them.
  * ES module, no runtime dependencies.
  */
-export const MODEL_VERSION='2.3.0-reinfection-waves';
+export const MODEL_VERSION='2.4.0-year-waves';
 const AGE_GROUPS=['child','adult','older'];
 const AGE_INDEX={child:0,adult:1,older:2};
 const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
@@ -17,7 +17,7 @@ function poissonUpperQuantile(lambda,p=.99){if(!(lambda>0))return 0;let k=0,term
 function poissonSample(lambda,rand){if(!(lambda>0))return 0;if(lambda<30){const L=Math.exp(-lambda);let k=0,p=1;do{k++;p*=rand();}while(p>L);return k-1;}const z=Math.sqrt(-2*Math.log(Math.max(rand(),1e-12)))*Math.cos(2*Math.PI*rand());return Math.max(0,Math.round(lambda+Math.sqrt(lambda)*z));}
 function requireProb(x,name){if(!Number.isFinite(x)||x<0||x>1)throw Error('invalid probability '+name);}
 function requireValid(cfg){
- if(!Number.isInteger(cfg.population)||cfg.population<10||cfg.population>30000)throw Error('population must be integer 10..30000');
+ if(!Number.isInteger(cfg.population)||cfg.population<10||cfg.population>20000)throw Error('population must be integer 10..20000');
  if(!Number.isInteger(cfg.regions)||cfg.regions<2||cfg.regions>20)throw Error('regions must be 2..20');
  if(!Number.isInteger(cfg.days)||cfg.days<1||cfg.days>3650)throw Error('days must be integer 1..3650');
  for(const f of ['latentDays','infectiousDays','reportDelayDays'])if(!Number.isInteger(cfg[f])||cfg[f]<0||(f==='infectiousDays'&&cfg[f]===0))throw Error('invalid duration '+f);
@@ -29,6 +29,10 @@ function requireValid(cfg){
  const allowed=['school_closure','remote_work','workplace_closure','mobility_restriction','bridge_closure','retail_limit','community_closure','hospital_capacity_change','lockdown','case_isolation'];
  for(const item of cfg.interventions){if(!allowed.includes(item.type))throw Error('unknown intervention '+item.type);if(!Number.isInteger(item.startDay)||!Number.isInteger(item.endDay)||item.endDay<item.startDay)throw Error('invalid intervention window');if(item.fraction!==undefined)requireProb(item.fraction,'intervention fraction');}
  const v=cfg.vaccination;for(const k of ['uptakeProbability','infectionProtectionFraction','severeProtectionFraction'])requireProb(v[k],'vaccination '+k);
+ for(const campaign of cfg.vaccinationCampaigns??[]){
+  if(!Number.isInteger(campaign.doseNumber)||campaign.doseNumber<1||campaign.doseNumber>3)throw Error('invalid vaccine dose number');
+  for(const k of ['uptakeProbability','infectionProtectionFraction','severeProtectionFraction'])requireProb(campaign[k],'vaccinationCampaign '+k);
+ }
  if(cfg.cityMixing){for(const [k,v] of Object.entries(cfg.cityMixing)){if(k.endsWith('ExternalRegionProbability'))requireProb(v,'cityMixing '+k);}}
  if(cfg.waveDynamics){
   const min=cfg.waveDynamics.naturalImmunityDaysMin,max=cfg.waveDynamics.naturalImmunityDaysMax;
@@ -54,7 +58,7 @@ export function configFromProfile(doc,level='medium',overrides={}){
  const severity={};for(const ag of AGE_GROUPS)severity[ag]=clamp(baseHospitalGivenSymptoms*(clinical.hospitalization_incidence_relative_by_age[ag]??1));
  const pop=overrides.population??1200;
  const bedsPer100k=doc.hospital_capacity.registered_beds_per_100k.all_existing;
- const defaults={population:pop,regions:6,days:180,initialInfections:1,initialInfectionMode:'random',seed:20260925,pathogenId,beta,
+ const defaults={population:pop,regions:6,days:360,initialInfections:1,initialInfectionMode:'random',seed:20260925,pathogenId,beta,
   latentDays:doc.scenario_assumptions.latent_days,infectiousDays:doc.scenario_assumptions.infectious_days,symptomaticProbability:symptomatic,
   reportDelayDays:2,detectionProbabilityIfSymptomatic:median(pnadCare),beds:Math.max(1,Math.round(pop*bedsPer100k/100000)),
   severeProbabilityByAge:severity,relativeSusceptibilityByAge:{child:1,adult:1,older:1},
@@ -64,13 +68,14 @@ export function configFromProfile(doc,level='medium',overrides={}){
   contactMatrices:doc.contacts.matrix_mean_contacts_per_person_day_by_layer,contactAgeOrder:doc.contacts.age_group_order,
   durationCategories:doc.contact_duration.duration_categories,durationHours:doc.contact_duration.representative_hours_for_engine,
   durationProbabilities:doc.contact_duration.probabilities_by_layer,communityAllocation:doc.scenario_assumptions.community_allocation_proxy??{retail:.44,community:.56},hospitalContactScale:doc.scenario_assumptions.hospital_contact_scale??0,
-  maxContactSamplesPerPerson:4,crossRegionWorkProbability:doc.scenario_assumptions.cross_region_work_probability??0,cityMixing:{workExternalRegionProbability:doc.scenario_assumptions.city_mixing?.work_external_region_probability??.40,schoolExternalRegionProbability:doc.scenario_assumptions.city_mixing?.school_external_region_probability??.15,retailExternalRegionProbability:doc.scenario_assumptions.city_mixing?.retail_external_region_probability??.45,communityExternalRegionProbability:doc.scenario_assumptions.city_mixing?.community_external_region_probability??.35,hospitalExternalRegionProbability:doc.scenario_assumptions.city_mixing?.hospital_external_region_probability??.50},waveDynamics:{naturalImmunityDaysMin:doc.scenario_assumptions.reinfection_wave_scenarios?.[pathogenId]?.natural_immunity_days_min??60,naturalImmunityDaysMax:doc.scenario_assumptions.reinfection_wave_scenarios?.[pathogenId]?.natural_immunity_days_max??100,externalImportationAttemptsPer1000PerDay:doc.scenario_assumptions.reinfection_wave_scenarios?.[pathogenId]?.external_importation_attempts_per_1000_per_day??.02},deniedCareMortalityMultiplier:doc.scenario_assumptions.denied_care_mortality_multiplier??1,preSymptomaticDays:doc.scenario_assumptions.pre_symptomatic_days??0,externalImportationRatePerDay:pop*(doc.scenario_assumptions.reinfection_wave_scenarios?.[pathogenId]?.external_importation_attempts_per_1000_per_day??.02)/1000,startEpiWeek:1,routine:{weekdayOutingProbability:doc.scenario_assumptions.routine_outing_probability?.weekday??.55,weekendOutingProbability:doc.scenario_assumptions.routine_outing_probability?.weekend??.72},
+  maxContactSamplesPerPerson:4,crossRegionWorkProbability:doc.scenario_assumptions.cross_region_work_probability??0,cityMixing:{workExternalRegionProbability:doc.scenario_assumptions.city_mixing?.work_external_region_probability??.40,schoolExternalRegionProbability:doc.scenario_assumptions.city_mixing?.school_external_region_probability??.15,retailExternalRegionProbability:doc.scenario_assumptions.city_mixing?.retail_external_region_probability??.45,communityExternalRegionProbability:doc.scenario_assumptions.city_mixing?.community_external_region_probability??.35,hospitalExternalRegionProbability:doc.scenario_assumptions.city_mixing?.hospital_external_region_probability??.50},waveDynamics:{naturalImmunityDaysMin:doc.scenario_assumptions.reinfection_wave_scenarios?.[pathogenId]?.natural_immunity_days_min??60,naturalImmunityDaysMax:doc.scenario_assumptions.reinfection_wave_scenarios?.[pathogenId]?.natural_immunity_days_max??100,externalImportationAttemptsPer1000PerDay:doc.scenario_assumptions.reinfection_wave_scenarios?.[pathogenId]?.external_importation_attempts_per_1000_per_day??.02,waveSchedule:doc.scenario_assumptions.annual_wave_schedule??[{wave:1,startDay:0,endDay:89,peakTransmissionMultiplier:1.35,troughTransmissionMultiplier:.58,importationMultiplier:1.4},{wave:2,startDay:90,endDay:179,peakTransmissionMultiplier:1.25,troughTransmissionMultiplier:.55,importationMultiplier:1.25},{wave:3,startDay:180,endDay:269,peakTransmissionMultiplier:1.12,troughTransmissionMultiplier:.52,importationMultiplier:1.15},{wave:4,startDay:270,endDay:359,peakTransmissionMultiplier:1.08,troughTransmissionMultiplier:.50,importationMultiplier:1.10}]},deniedCareMortalityMultiplier:doc.scenario_assumptions.denied_care_mortality_multiplier??1,unmetCareMortalityPerDeniedDay:doc.scenario_assumptions.unmet_care_mortality_per_denied_day??.18,preSymptomaticDays:doc.scenario_assumptions.pre_symptomatic_days??0,externalImportationRatePerDay:pop*(doc.scenario_assumptions.reinfection_wave_scenarios?.[pathogenId]?.external_importation_attempts_per_1000_per_day??.02)/1000,startEpiWeek:1,routine:{weekdayOutingProbability:doc.scenario_assumptions.routine_outing_probability?.weekday??.55,weekendOutingProbability:doc.scenario_assumptions.routine_outing_probability?.weekend??.72},
   clinicalProfile:clinical,
   alert:{mode:'hospital_excess',windowDays:7,alpha:doc.surveillance.alert_alpha,consecutiveWindows:doc.surveillance.consecutive_windows,weeklyBaselinePer100k:doc.surveillance.weekly_registered_srag_hospitalizations_per_100k_2025},
   vaccination:{enabled:false,availableDay:180,dosesPerDay:35,uptakeProbability:.75,daysToProtection:14,infectionProtectionFraction:.55,severeProtectionFraction:.60,priority:'older_first'},
+  vaccinationCampaigns:[],
   interventions:[]};
  const cfg={...defaults,...overrides,beta,pathogenId};
- cfg.alert={...defaults.alert,...overrides.alert};cfg.vaccination={...defaults.vaccination,...overrides.vaccination};cfg.interventions=overrides.interventions??[];
+ cfg.alert={...defaults.alert,...overrides.alert};cfg.vaccination={...defaults.vaccination,...overrides.vaccination};cfg.vaccinationCampaigns=overrides.vaccinationCampaigns??defaults.vaccinationCampaigns;cfg.interventions=overrides.interventions??[];
  cfg.severeProbabilityByAge={...defaults.severeProbabilityByAge,...overrides.severeProbabilityByAge};cfg.relativeSusceptibilityByAge={...defaults.relativeSusceptibilityByAge,...overrides.relativeSusceptibilityByAge};cfg.cityMixing={...defaults.cityMixing,...overrides.cityMixing};cfg.waveDynamics={...defaults.waveDynamics,...overrides.waveDynamics};
  if(overrides.externalImportationRatePerDay===undefined)cfg.externalImportationRatePerDay=cfg.population*(cfg.waveDynamics.externalImportationAttemptsPer1000PerDay??0)/1000;
  return requireValid(cfg);
@@ -186,7 +191,7 @@ export function makeCity(cfg){
     healthWorker,teacher,working,compliance:random(),vaccineWilling:random(),
     state:'S',infectedDay:null,infectiousStartDay:null,onsetDay:null,symptomatic:null,
     symptomOnsetProcessed:false,outcomeDay:null,source:null,severe:false,severityAssessed:false,
-    hospitalRequestDay:null,admittedDay:null,careDenied:false,vaccinatedDay:null,detected:false,
+    hospitalRequestDay:null,admittedDay:null,careDenied:false,careDeniedDays:0,vaccinatedDay:null,lastVaccinatedDay:null,vaccineDoses:0,vaccineHistory:[],detected:false,
     infectionCount:0,recoveredDay:null,immunityUntilDay:null
    });
   }
@@ -259,7 +264,25 @@ export function simulate(config,options={}){
   const target=seeds[n],place=placeForContext(target,seedContext);
   infect(target,0,null,'seed',place,null,'seed',cfg.initialSeedPlaceId??visualOf(place));
  }
- let alerted=false,consecutiveAlertWindows=0,totalDoses=0,deniedPeople=new Set();
+ let alerted=false,consecutiveAlertWindows=0,totalDoses=0,deniedPeople=new Set(),unmetCareDeaths=0,totalDosesByNumber={1:0,2:0,3:0};
+
+ function waveState(day){
+  const schedule=cfg.waveDynamics?.waveSchedule??[];
+  const item=schedule.find(w=>day>=w.startDay&&day<=w.endDay)??schedule.at(-1)??{wave:1,startDay:0,endDay:cfg.days-1,peakTransmissionMultiplier:1,troughTransmissionMultiplier:1,importationMultiplier:1};
+  const span=Math.max(1,item.endDay-item.startDay);
+  const phase=clamp((day-item.startDay)/span,0,1);
+  const pulse=Math.sin(Math.PI*phase);
+  const trough=item.troughTransmissionMultiplier??1,peak=item.peakTransmissionMultiplier??1;
+  return {wave:item.wave??1,transmissionMultiplier:trough+(peak-trough)*pulse,importationMultiplier:item.importationMultiplier??1};
+ }
+ function vaccineProtection(person,day,key){
+  let best=0;
+  for(const dose of person.vaccineHistory??[]){
+   if(day>=dose.day+(dose.daysToProtection??0))best=Math.max(best,Number(dose[key]||0));
+  }
+  if(!best&&person.vaccinatedDay!==null&&cfg.vaccination?.enabled&&day>=person.vaccinatedDay+(cfg.vaccination.daysToProtection??0))best=Number(cfg.vaccination[key]||0);
+  return clamp(best);
+ }
 
  function processContactGroups(groups,day,block,scaleByLayer,vaccine){
   let created=0;
@@ -290,8 +313,9 @@ export function simulate(config,options={}){
      const hours=durationSample(cfg,layer,rand);
      function expose(target,infector){
       if(target.state!=='S'||infector.state!=='I'||day>=infector.onsetDay+cfg.infectiousDays)return;
-      const vp=target.vaccinatedDay!==null&&day>=target.vaccinatedDay+vaccine.daysToProtection?vaccine.infectionProtectionFraction:0;
-      const h=cfg.beta*hours*expansion*(cfg.relativeSusceptibilityByAge[target.age]??1)*(1-vp);
+      const vp=vaccineProtection(target,day,'infectionProtectionFraction');
+      const wave=waveState(day);
+      const h=cfg.beta*wave.transmissionMultiplier*hours*expansion*(cfg.relativeSusceptibilityByAge[target.age]??1)*(1-vp);
       if(!(h>0))return;
       hazard.set(target.id,(hazard.get(target.id)||0)+h);
       if(!contrib.has(target.id))contrib.set(target.id,[]);
@@ -320,12 +344,22 @@ export function simulate(config,options={}){
     events.push({day,type:'immunity_waned',person:p.id,previousInfections:p.infectionCount??1});
    }
   }
-  if(vaccine.enabled&&day>=vaccine.availableDay&&vaccine.dosesPerDay>0){
-   let v=P.filter(p=>(p.state==='S'||p.state==='R')&&p.vaccinatedDay===null&&p.vaccineWilling<vaccine.uptakeProbability);
-   if(vaccine.priority==='older_first')v.sort((a,b)=>AGE_INDEX[b.age]-AGE_INDEX[a.age]||a.id-b.id);else shuffle(v,rand);
-   for(const p of v.slice(0,Math.floor(vaccine.dosesPerDay))){p.vaccinatedDay=day;dosesToday++;events.push({day,type:'vaccination',person:p.id});}
-   totalDoses+=dosesToday;
+  const doseCountsToday={1:0,2:0,3:0};
+  const campaigns=[...(cfg.vaccinationCampaigns??[])];
+  if(vaccine.enabled)campaigns.unshift({...vaccine,doseNumber:1,minDaysSincePreviousDose:0});
+  for(const campaign of campaigns){
+   if(day<campaign.availableDay||!(campaign.dosesPerDay>0))continue;
+   const doseNumber=campaign.doseNumber??1;
+   let eligibleDose=P.filter(p=>(p.state==='S'||p.state==='R')&&p.vaccineWilling<campaign.uptakeProbability&&(p.vaccineDoses??0)===doseNumber-1&&(doseNumber===1||day-(p.lastVaccinatedDay??-999)>=(campaign.minDaysSincePreviousDose??21)));
+   if(campaign.priority==='older_first')eligibleDose.sort((a,b)=>AGE_INDEX[b.age]-AGE_INDEX[a.age]||a.id-b.id);else shuffle(eligibleDose,rand);
+   for(const p of eligibleDose.slice(0,Math.floor(campaign.dosesPerDay))){
+    p.vaccineDoses=doseNumber;p.lastVaccinatedDay=day;if(doseNumber===1)p.vaccinatedDay=day;
+    p.vaccineHistory.push({doseNumber,day,daysToProtection:campaign.daysToProtection??14,infectionProtectionFraction:campaign.infectionProtectionFraction??0,severeProtectionFraction:campaign.severeProtectionFraction??0});
+    dosesToday++;doseCountsToday[doseNumber]=(doseCountsToday[doseNumber]||0)+1;totalDosesByNumber[doseNumber]=(totalDosesByNumber[doseNumber]||0)+1;
+    events.push({day,type:'vaccination',person:p.id,doseNumber});
+   }
   }
+  totalDoses+=dosesToday;
   const cap=applicable(cfg,'hospital_capacity_change',day,0);
   const beds=Math.max(0,cfg.beds+cap.reduce((s,p)=>s+(p.bedsDelta??0),0));
   const activeCare=()=>P.reduce((n,p)=>n+(p.state==='H'),0);
@@ -341,7 +375,7 @@ export function simulate(config,options={}){
    }
    if((p.state==='I'||p.state==='H')&&p.infectedDay!==null){
     if(p.state==='I'&&!p.severityAssessed&&day>=p.onsetDay){
-     p.severityAssessed=true;p.severe=Boolean(p.symptomatic)&&rand()<(cfg.severeProbabilityByAge[p.age]??0);
+     p.severityAssessed=true;const severeProtection=vaccineProtection(p,day,'severeProtectionFraction');p.severe=Boolean(p.symptomatic)&&rand()<((cfg.severeProbabilityByAge[p.age]??0)*(1-severeProtection));
      if(p.severe){
       let delay=pmfSample(clinicalPmf(cfg,'symptom_to_hospital_pmf_days_0_30',p.age),rand);
       if(delay===null)delay=2;p.hospitalRequestDay=p.onsetDay+delay;
@@ -354,29 +388,34 @@ export function simulate(config,options={}){
       let stay=pmfSample(clinicalPmf(cfg,'hospital_to_outcome_pmf_days_0_30',p.age),rand);
       if(stay===null||stay<1)stay=7;p.outcomeDay=Math.max(p.outcomeDay,day+stay);
       newAdmissions++;events.push({day,type:'hospital_admission',person:p.id,visualPlace:visualOf(p.hospital)});
-     }else{p.careDenied=true;deniedPeople.add(p.id);}
+     }else{p.careDenied=true;p.careDeniedDays=(p.careDeniedDays??0)+1;deniedPeople.add(p.id);events.push({day,type:'bed_denied',person:p.id,careDeniedDays:p.careDeniedDays});}
     }
     if(day>=p.outcomeDay){
-     let died=false;
+     let died=false,deathAssociatedWithUnmetCare=false;
      if(p.severe){
       let risk=cfg.clinicalProfile?.death_fraction_given_hospitalized?.[p.age];if(!Number.isFinite(risk))risk=.05;
-      if(p.admittedDay===null)risk=clamp(risk*(cfg.deniedCareMortalityMultiplier??1));
-      died=rand()<risk;
+      const deniedDays=p.careDeniedDays??0;
+      if(deniedDays>0){
+       risk=clamp(risk*(1+(cfg.unmetCareMortalityPerDeniedDay??.18)*deniedDays),0,.95);
+       if(p.admittedDay===null)risk=Math.max(risk,clamp((cfg.clinicalProfile?.death_fraction_given_hospitalized?.[p.age]??.05)*(cfg.deniedCareMortalityMultiplier??1),0,.95));
+      }
+      died=rand()<risk;deathAssociatedWithUnmetCare=died&&deniedDays>0;
      }
-     p.state=died?'D':'R';if(died)newDeaths++;else{const span=(cfg.waveDynamics.naturalImmunityDaysMax-cfg.waveDynamics.naturalImmunityDaysMin)+1;const immunityDays=cfg.waveDynamics.naturalImmunityDaysMin+Math.floor(rand()*Math.max(1,span));p.recoveredDay=day;p.immunityUntilDay=day+immunityDays;}events.push({day,type:died?'death':'recovery',person:p.id,immunityUntilDay:p.immunityUntilDay});
+     p.state=died?'D':'R';if(died){newDeaths++;if(deathAssociatedWithUnmetCare)unmetCareDeaths++;}else{const span=(cfg.waveDynamics.naturalImmunityDaysMax-cfg.waveDynamics.naturalImmunityDaysMin)+1;const immunityDays=cfg.waveDynamics.naturalImmunityDaysMin+Math.floor(rand()*Math.max(1,span));p.recoveredDay=day;p.immunityUntilDay=day+immunityDays;}events.push({day,type:died?'death':'recovery',person:p.id,immunityUntilDay:p.immunityUntilDay,careDeniedDays:p.careDeniedDays??0,deathAssociatedWithUnmetCare});
     }
    }
   }
 
-  const importCount=poissonSample(cfg.externalImportationRatePerDay??0,rand);
+  const wave=waveState(day);
+  const importCount=poissonSample((cfg.externalImportationRatePerDay??0)*wave.importationMultiplier,rand);
   if(importCount>0){
    const susceptible=shuffle(P.filter(p=>p.state==='S'),rand);
    let attempts=0;
    for(const p of susceptible){
     if(attempts>=importCount)break;
     attempts++;
-    const protectedByVaccine=p.vaccinatedDay!==null&&day>=p.vaccinatedDay+vaccine.daysToProtection;
-    if(protectedByVaccine&&rand()<vaccine.infectionProtectionFraction)continue;
+    const importProtection=vaccineProtection(p,day,'infectionProtectionFraction');
+    if(importProtection>0&&rand()<importProtection)continue;
     if(infect(p,day,null,'external_importation',p.home,null,'external',p.visualHome))newInfections++;
    }
   }
@@ -459,7 +498,7 @@ export function simulate(config,options={}){
    day,...cnt,alive:cfg.population-cnt.D,newInfections,newReinfections:reinfectionEpisodes-reinfectionsBefore,immunityWaned:immunityWanedToday,newReportedCases:newReports,gameAlert:alerted,
    alertMetric,alertThreshold,expectedHospitalAdmissions7d:expected,admissions:newAdmissions,deathIncidence:newDeaths,
    bedCapacity:beds,bedsOccupied:cnt.H,bedRequests:requestedBeds,unmetBedRequests:Math.max(0,requestedBeds-newAdmissions),
-   dosesDelivered:dosesToday,cumulativeDoses:totalDoses,bridgeCrossings,cumulativeUniqueInfected:everInfectedPeople.size,cumulativeInfectionEpisodes:infectionEpisodes,cumulativeReinfections:reinfectionEpisodes
+   dosesDelivered:dosesToday,dose1Delivered:doseCountsToday[1]||0,dose2Delivered:doseCountsToday[2]||0,dose3Delivered:doseCountsToday[3]||0,cumulativeDoses:totalDoses,cumulativeDose1:totalDosesByNumber[1]||0,cumulativeDose2:totalDosesByNumber[2]||0,cumulativeDose3:totalDosesByNumber[3]||0,bridgeCrossings,cumulativeUniqueInfected:everInfectedPeople.size,cumulativeInfectionEpisodes:infectionEpisodes,cumulativeReinfections:reinfectionEpisodes,waveNumber:wave.wave,waveTransmissionMultiplier:wave.transmissionMultiplier,cumulativeUnmetCareDeaths:unmetCareDeaths
   });
   if(options.onDay)options.onDay(daily.at(-1));
  }
@@ -475,7 +514,7 @@ export function simulate(config,options={}){
    peopleReinfected:P.filter(p=>(p.infectionCount??0)>1).length,
    reportedCases:events.filter(e=>e.type==='reported_case').length,
    hospitalAdmissions:events.filter(e=>e.type==='hospital_admission').length,
-   uniqueDeniedBed:deniedPeople.size,vaccinated:totalDoses,alertDay:alertDays[0]??null,
+   uniqueDeniedBed:deniedPeople.size,unmetCareDeaths,vaccinated:totalDoses,vaccineDosesByNumber:totalDosesByNumber,alertDay:alertDays[0]??null,
    transmissionsByLayer:transmissionByLayer,
    regionsReached:new Set(events.filter(e=>e.type==='infection').map(e=>e.targetRegion).filter(Number.isInteger)).size,
    crossRegionTransmissions:events.filter(e=>e.type==='infection'&&e.sourceRegion!==null&&e.sourceRegion!==e.targetRegion).length
