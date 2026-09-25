@@ -79,16 +79,102 @@ function sampleHousehold(cfg,rand){
 }
 export function makeCity(cfg){
  const random=rng(cfg.seed),agents=[],places=new Map(),homes=[],schools=[],workplaces=[],markets=[],parks=[],hospitals=[];
- const add=(kind,reg)=>{const id=kind+'-'+places.size;places.set(id,{id,type:kind,region:reg});return id;};
- for(let r=0;r<cfg.regions;r++){schools.push(add('school',r));workplaces.push(add('work',r));markets.push(add('retail',r));parks.push(add('community',r));hospitals.push(add('hospital',r));}
+ const spatial=cfg.spatialModel&&Array.isArray(cfg.spatialModel.homes)&&Array.isArray(cfg.spatialModel.places)?cfg.spatialModel:null;
+ const add=(kind,reg,id=null,visualId=null,meta={})=>{
+  const pid=id??(kind+'-'+places.size);
+  if(!places.has(pid))places.set(pid,{id:pid,type:kind,region:reg,visualId:visualId??pid,...meta});
+  return pid;
+ };
+ const layerType=t=>{
+  if(t==='school')return 'school';
+  if(t==='hospital')return 'hospital';
+  if(t==='office'||t==='civic'||t==='work')return 'work';
+  if(t==='market'||t==='commerce'||t==='restaurant'||t==='retail')return 'retail';
+  if(t==='park'||t==='community')return 'community';
+  return null;
+ };
+ const byRegion=Array.from({length:cfg.regions},()=>({school:[],work:[],retail:[],community:[],hospital:[],homes:[]}));
+ const pickWeighted=(items,rand)=>{
+  if(!items?.length)return null;
+  const idx=weightedIndex(items.map(x=>Math.max(1,Number(x.capacity)||1)),rand);
+  return items[Math.max(0,idx)];
+ };
+ if(spatial){
+  for(const h of spatial.homes){
+   const r=Number.isInteger(h.regionIndex)?clamp(h.regionIndex,0,cfg.regions-1):0;
+   byRegion[r].homes.push({id:h.id,region:r});
+  }
+  for(const p of spatial.places){
+   const kind=layerType(p.type);
+   if(!kind)continue;
+   const r=Number.isInteger(p.regionIndex)?clamp(p.regionIndex,0,cfg.regions-1):0;
+   const id=add(kind,r,p.id,p.id,{capacity:Number(p.capacity)||null,sourceType:p.type,name:p.name??p.id});
+   byRegion[r][kind].push({id,capacity:Number(p.capacity)||1});
+  }
+ }
+ for(let r=0;r<cfg.regions;r++){
+  const ensure=(kind,arr)=>{
+   if(arr.length)return;
+   const id=add(kind,r,null,null,{syntheticFallback:true});
+   arr.push({id,capacity:1});
+  };
+  ensure('school',byRegion[r].school);
+  ensure('work',byRegion[r].work);
+  ensure('retail',byRegion[r].retail);
+  ensure('community',byRegion[r].community);
+  ensure('hospital',byRegion[r].hospital);
+  schools.push(...byRegion[r].school.map(x=>x.id));
+  workplaces.push(...byRegion[r].work.map(x=>x.id));
+  markets.push(...byRegion[r].retail.map(x=>x.id));
+  parks.push(...byRegion[r].community.map(x=>x.id));
+  hospitals.push(...byRegion[r].hospital.map(x=>x.id));
+ }
+ const regionWeights=byRegion.map((x)=>Math.max(1,x.homes.length));
+ const homeOrder=byRegion.map(x=>shuffle([...x.homes],random));
+ const homeCursor=Array(cfg.regions).fill(0);
  let house=0;
- while(agents.length<cfg.population){const region=house%cfg.regions,home=add('household',region);homes.push(home);let groups=sampleHousehold(cfg,random);if(!groups.length)groups=['adult'];
-  for(const ageGroup of groups){if(agents.length>=cfg.population)break;const ageYears=sampleAgeYears(ageGroup,cfg,random);const employmentP=cfg.employmentProbabilityByAge?.[ageGroup]??(ageGroup==='adult'?.62:ageGroup==='older'?.13:0);const working=random()<employmentP;
-   const healthWorker=working&&random()<(cfg.healthWorkerShare??0),teacher=working&&!healthWorker&&random()<(cfg.teacherShare??0);const schoolEnrolled=ageYears>=6&&ageYears<=17&&random()<(cfg.schoolEnrollmentProbability??1);
-   const jobRegion=(healthWorker||teacher||random()>cfg.crossRegionWorkProbability)?region:(region+Math.ceil(cfg.regions/2))%cfg.regions;const work=healthWorker?hospitals[jobRegion]:teacher?schools[jobRegion]:workplaces[jobRegion];
-   agents.push({id:agents.length,age:ageGroup,ageYears,region,home,school:schoolEnrolled?schools[region]:null,schoolEnrolled,work,workRegion:jobRegion,healthWorker,teacher,working,compliance:random(),vaccineWilling:random(),state:'S',infectedDay:null,infectiousStartDay:null,onsetDay:null,symptomatic:null,symptomOnsetProcessed:false,outcomeDay:null,source:null,severe:false,severityAssessed:false,hospitalRequestDay:null,admittedDay:null,careDenied:false,vaccinatedDay:null,detected:false});}
-  house++;}
- return {agents,places,houses:homes,schools,workplaces,markets,parks,hospitals};
+ while(agents.length<cfg.population){
+  const region=spatial?Math.max(0,weightedIndex(regionWeights,random)):house%cfg.regions;
+  const visualHomes=homeOrder[region];
+  let visualHome=null;
+  if(visualHomes.length){
+   visualHome=visualHomes[homeCursor[region]%visualHomes.length].id;
+   homeCursor[region]++;
+  }else visualHome='residential-node-'+region;
+  const homeId='household-'+String(house+1).padStart(6,'0');
+  const home=add('household',region,homeId,visualHome,{householdIndex:house});
+  homes.push(home);
+  let groups=sampleHousehold(cfg,random);if(!groups.length)groups=['adult'];
+  const schoolChoice=()=>pickWeighted(byRegion[region].school,random)?.id??null;
+  const retailChoice=()=>pickWeighted(byRegion[region].retail,random)?.id??null;
+  const communityChoice=()=>pickWeighted(byRegion[region].community,random)?.id??null;
+  for(const ageGroup of groups){
+   if(agents.length>=cfg.population)break;
+   const ageYears=sampleAgeYears(ageGroup,cfg,random);
+   const employmentP=cfg.employmentProbabilityByAge?.[ageGroup]??(ageGroup==='adult'?.62:ageGroup==='older'?.13:0);
+   const working=random()<employmentP;
+   const healthWorker=working&&random()<(cfg.healthWorkerShare??0);
+   const teacher=working&&!healthWorker&&random()<(cfg.teacherShare??0);
+   const schoolEnrolled=ageYears>=6&&ageYears<=17&&random()<(cfg.schoolEnrollmentProbability??1);
+   const jobRegion=(healthWorker||teacher||random()>cfg.crossRegionWorkProbability)?region:(region+Math.ceil(cfg.regions/2))%cfg.regions;
+   const jobBuckets=byRegion[jobRegion];
+   const school=schoolEnrolled?schoolChoice():null;
+   const work=healthWorker?(pickWeighted(jobBuckets.hospital,random)?.id??null):teacher?(pickWeighted(jobBuckets.school,random)?.id??null):(working?(pickWeighted(jobBuckets.work,random)?.id??null):null);
+   const market=retailChoice();
+   const community=communityChoice();
+   const hospital=pickWeighted(byRegion[region].hospital,random)?.id??null;
+   agents.push({
+    id:agents.length,age:ageGroup,ageYears,region,home,visualHome,householdId:home,
+    school,schoolEnrolled,work,workRegion:jobRegion,market,community,hospital,
+    healthWorker,teacher,working,compliance:random(),vaccineWilling:random(),
+    state:'S',infectedDay:null,infectiousStartDay:null,onsetDay:null,symptomatic:null,
+    symptomOnsetProcessed:false,outcomeDay:null,source:null,severe:false,severityAssessed:false,
+    hospitalRequestDay:null,admittedDay:null,careDenied:false,vaccinatedDay:null,detected:false
+   });
+  }
+  house++;
+ }
+ return {agents,places,houses:homes,schools,workplaces,markets,parks,hospitals,spatialModel:spatial};
 }
 const sides=(region,regions)=>region<Math.ceil(regions/2)?0:1;
 function applies(policy,day,region){return day>=policy.startDay&&day<=policy.endDay&&(!policy.regionIds||policy.regionIds.includes(region));}
