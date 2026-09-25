@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {MODEL_VERSION,configFromProfile,makeCity,simulate,summarizeRuns} from '../engine.mjs';
 const params=JSON.parse(fs.readFileSync(new URL('../data/calibrated_parameters_v2.json',import.meta.url),'utf8'));
-assert.equal(MODEL_VERSION,'2.2.0-city-mixing');
+assert.equal(MODEL_VERSION,'2.3.0-reinfection-waves');
 const base=configFromProfile(params,'medium',{population:600,days:45,seed:1234,pathogenId:'influenza'});
 assert.equal(base.population,600); assert.ok(base.cityMixing.workExternalRegionProbability>0); assert.ok(base.cityMixing.retailExternalRegionProbability>0); assert.equal(base.hospitalContactScale,0);
 assert.ok(Array.isArray(base.contactMatrices.home));
@@ -73,7 +73,7 @@ assert.equal(householdOnly.summary.transmissionsByLayer.community??0,0);
 const r1=simulate(base),r2=simulate(base);
 assert.deepEqual(r1.daily,r2.daily,'same seed must be reproducible');
 for(const d of r1.daily) assert.equal(d.S+d.E+d.I+d.H+d.R+d.D,600,'population must be conserved');
-const zero=simulate({...base,beta:0,initialInfections:2,days:25});
+const zero=simulate({...base,beta:0,initialInfections:2,days:25,externalImportationRatePerDay:0});
 assert.equal(zero.summary.everInfected,2,'beta=0 must not create secondary infections');
 const closed=simulate({...base,seed:88,interventions:[{type:'school_closure',startDay:0,endDay:44,fraction:1}]});
 assert.equal(closed.summary.transmissionsByLayer.school??0,0,'closed schools must have no school transmission');
@@ -84,6 +84,22 @@ assert.equal(lockdown.summary.transmissionsByLayer.retail??0,0);
 assert.equal(lockdown.summary.transmissionsByLayer.community??0,0);
 const imported=simulate({...base,beta:0,initialInfections:0,externalImportationRatePerDay:1,days:5,seed:77});
 assert.ok(imported.summary.everInfected>0,'external importation can reseed the city when explicitly enabled');
+const waveBase=configFromProfile(params,'low',{
+  population:20,regions:2,days:15,seed:404,pathogenId:'influenza',
+  initialInfections:20,beta:0,latentDays:1,infectiousDays:2,symptomaticProbability:0,
+  severeProbabilityByAge:{child:0,adult:0,older:0},
+  externalImportationRatePerDay:20,
+  waveDynamics:{naturalImmunityDaysMin:1,naturalImmunityDaysMax:1,externalImportationAttemptsPer1000PerDay:0}
+});
+const recurrent=simulate(waveBase);
+assert.ok(recurrent.summary.reinfections>0,'waning natural immunity plus reintroductions must allow reinfection');
+assert.ok(recurrent.daily.some(d=>d.newReinfections>0),'daily output must expose reinfection episodes');
+assert.ok(recurrent.daily.some(d=>d.immunityWaned>0),'recovered agents must return to susceptibility after the configured immunity window');
+const vaccinatedWave=simulate({...waveBase,vaccination:{
+  enabled:true,availableDay:0,dosesPerDay:20,uptakeProbability:1,daysToProtection:0,
+  infectionProtectionFraction:1,severeProtectionFraction:1,priority:'older_first'
+}});
+assert.ok(vaccinatedWave.summary.reinfections<recurrent.summary.reinfections,'protective vaccination must reduce successful reinfections/reintroductions in the scenario');
 const cases=simulate({...base,seed:7,symptomaticProbability:1,severeProbabilityByAge:{child:1,adult:1,older:1},beds:600,beta:0,initialInfections:20,days:40});
 assert.ok(cases.summary.hospitalAdmissions>0,'severe symptomatic cases should reach hospital using empirical delay PMFs');
 const maxPopulationCfg=configFromProfile(params,'low',{population:30000,days:1,seed:9090,pathogenId:'influenza',regions:2,spatialModel});
