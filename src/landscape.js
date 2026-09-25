@@ -102,13 +102,6 @@ export function finishLandscape(root){
  root.replaceChildren();countryside(root);
  const frame=E('g',{id:'reference-city',transform:`translate(${MAP.x} ${MAP.y}) scale(${MAP.scale})`},root);
  E('image',{href:'./assets/city-reference.svg',x:0,y:0,width:MAP.size,height:MAP.size,'pointer-events':'none','aria-hidden':'true'},frame);
- // East of the right-bank north/south highway is rural land. The source SVG
- // has a gray square background there, so mask only that strip in green while
- // keeping the highway itself as the visible boundary of the urban area.
- P('M706 0L709 34 710 60 714 122 719 159 719 248 723 259 721 277 725 368 718 383 713 392 688 436 663 494 647 515 654 655 666 704 666 711 670 730 675 740H740V0Z','#dceacb',frame,{
-  class:'east-rural-beyond-highway',
-  'pointer-events':'none'
- });
  const homes=E('g',{id:'homes-layer'},frame);const homeCount=addHomes(homes);
  const hubs=E('g',{id:'places-layer'},frame);
  for(const p of places)makeFacility(p,hubs);
