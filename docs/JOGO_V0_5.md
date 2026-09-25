@@ -79,3 +79,21 @@ O conjunto de testes exige que:
 ## Próxima etapa
 
 A principal limitação espacial continua sendo o roteamento físico pelas três pontes. A principal evolução epidemiológica futura é calibrar imunidade/reinfecção com fontes específicas por patógeno em vez de manter esses intervalos como hipóteses de jogo.
+
+
+## Ponto de decisão obrigatório no alerta hospitalar
+
+Quando o primeiro `game_alert` é alcançado, a linha do tempo para exatamente no dia do alerta.
+
+Enquanto o estado da interface estiver em `awaiting-decision`:
+
+- `Continuar` fica bloqueado;
+- `+1 dia` fica bloqueado;
+- as ações ficam disponíveis;
+- o jogador também pode escolher explicitamente `Continuar sem ação`.
+
+A simulação só volta a avançar quando uma dessas escolhas é registrada.
+
+Ao escolher uma intervenção, ela entra em vigor no dia seguinte ao alerta e o cenário é recalculado com a mesma população, seed e paciente zero. Ao escolher `Continuar sem ação`, nenhuma intervenção é adicionada e a linha do tempo é liberada imediatamente.
+
+A ausência de clique não é interpretada como decisão.
