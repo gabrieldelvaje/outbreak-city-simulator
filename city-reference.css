@@ -142,3 +142,41 @@ html[data-theme="dark"] #places-layer .place-pin-tooltip-text{
     transition:none;
   }
 }
+
+
+/* "Locais públicos" hides only the floating pins; colored building footprints remain visible. */
+#places-layer.place-pins-hidden .place-pin{
+  display:none !important;
+}
+
+/* Residential graph nodes are intentionally subdued so buildings/roads stay dominant. */
+#homes-layer .home-node > circle:first-of-type{
+  fill:#7d898e !important;
+  opacity:.42 !important;
+  stroke:none !important;
+  stroke-width:0 !important;
+}
+#homes-layer .home-node:hover > circle:first-of-type,
+#homes-layer .home-node:focus-visible > circle:first-of-type{
+  fill:#68757b !important;
+  opacity:.68 !important;
+  stroke:none !important;
+  stroke-width:0 !important;
+  r:6px;
+}
+/* Keep the invisible interaction target invisible. */
+#homes-layer .home-node > circle:last-of-type,
+#homes-layer .home-node:hover > circle:last-of-type,
+#homes-layer .home-node:focus-visible > circle:last-of-type{
+  fill:transparent !important;
+  stroke:none !important;
+}
+html[data-theme="dark"] #homes-layer .home-node > circle:first-of-type{
+  fill:#9aa6ad !important;
+  opacity:.34 !important;
+}
+html[data-theme="dark"] #homes-layer .home-node:hover > circle:first-of-type,
+html[data-theme="dark"] #homes-layer .home-node:focus-visible > circle:first-of-type{
+  fill:#aeb8be !important;
+  opacity:.58 !important;
+}
