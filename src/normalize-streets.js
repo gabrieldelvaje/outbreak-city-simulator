@@ -13,7 +13,7 @@ const MAP_PALETTE={
   '#fff87b':'#f4f8f9', // riverbanks
   '#74cbec':'#a9e4f3', // water
   '#a0dd3c':'#d5f6e4', // parks
-  '#f8f8f8':'#ffffff', // local streets
+  '#f8f8f8':'#d3dce7', // local streets: fill matches the existing edge color
   '#c1c1c1':'#e6e9ee', // building footprints
   '#f4ba3e':'#a8b9cc', // main roads and avenue joins
   '#dceacb':'#d9f7e6', // surrounding green areas
