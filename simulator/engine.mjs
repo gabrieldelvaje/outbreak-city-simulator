@@ -5,7 +5,7 @@
  * effects remain sensitivity assumptions where the supplied data do not identify them.
  * ES module, no runtime dependencies.
  */
-export const MODEL_VERSION='2.1.0-spatial-routines';
+export const MODEL_VERSION='2.2.0-city-mixing';
 const AGE_GROUPS=['child','adult','older'];
 const AGE_INDEX={child:0,adult:1,older:2};
 const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
@@ -29,6 +29,7 @@ function requireValid(cfg){
  const allowed=['school_closure','remote_work','workplace_closure','mobility_restriction','bridge_closure','retail_limit','community_closure','hospital_capacity_change','lockdown','case_isolation'];
  for(const item of cfg.interventions){if(!allowed.includes(item.type))throw Error('unknown intervention '+item.type);if(!Number.isInteger(item.startDay)||!Number.isInteger(item.endDay)||item.endDay<item.startDay)throw Error('invalid intervention window');if(item.fraction!==undefined)requireProb(item.fraction,'intervention fraction');}
  const v=cfg.vaccination;for(const k of ['uptakeProbability','infectionProtectionFraction','severeProtectionFraction'])requireProb(v[k],'vaccination '+k);
+ if(cfg.cityMixing){for(const [k,v] of Object.entries(cfg.cityMixing)){if(k.endsWith('ExternalRegionProbability'))requireProb(v,'cityMixing '+k);}}
  return cfg;
 }
 function median(xs){const a=[...xs].filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return 0;return a[Math.floor((a.length-1)/2)];}
@@ -58,7 +59,7 @@ export function configFromProfile(doc,level='medium',overrides={}){
   contactMatrices:doc.contacts.matrix_mean_contacts_per_person_day_by_layer,contactAgeOrder:doc.contacts.age_group_order,
   durationCategories:doc.contact_duration.duration_categories,durationHours:doc.contact_duration.representative_hours_for_engine,
   durationProbabilities:doc.contact_duration.probabilities_by_layer,communityAllocation:doc.scenario_assumptions.community_allocation_proxy??{retail:.44,community:.56},hospitalContactScale:doc.scenario_assumptions.hospital_contact_scale??0,
-  maxContactSamplesPerPerson:4,crossRegionWorkProbability:doc.scenario_assumptions.cross_region_work_probability??0,deniedCareMortalityMultiplier:doc.scenario_assumptions.denied_care_mortality_multiplier??1,preSymptomaticDays:doc.scenario_assumptions.pre_symptomatic_days??0,externalImportationRatePerDay:0,startEpiWeek:1,routine:{weekdayOutingProbability:doc.scenario_assumptions.routine_outing_probability?.weekday??.55,weekendOutingProbability:doc.scenario_assumptions.routine_outing_probability?.weekend??.72},
+  maxContactSamplesPerPerson:4,crossRegionWorkProbability:doc.scenario_assumptions.cross_region_work_probability??0,cityMixing:{workExternalRegionProbability:doc.scenario_assumptions.city_mixing?.work_external_region_probability??.40,schoolExternalRegionProbability:doc.scenario_assumptions.city_mixing?.school_external_region_probability??.15,retailExternalRegionProbability:doc.scenario_assumptions.city_mixing?.retail_external_region_probability??.45,communityExternalRegionProbability:doc.scenario_assumptions.city_mixing?.community_external_region_probability??.35,hospitalExternalRegionProbability:doc.scenario_assumptions.city_mixing?.hospital_external_region_probability??.50},deniedCareMortalityMultiplier:doc.scenario_assumptions.denied_care_mortality_multiplier??1,preSymptomaticDays:doc.scenario_assumptions.pre_symptomatic_days??0,externalImportationRatePerDay:0,startEpiWeek:1,routine:{weekdayOutingProbability:doc.scenario_assumptions.routine_outing_probability?.weekday??.55,weekendOutingProbability:doc.scenario_assumptions.routine_outing_probability?.weekend??.72},
   clinicalProfile:clinical,
   alert:{mode:'hospital_excess',windowDays:7,alpha:doc.surveillance.alert_alpha,consecutiveWindows:doc.surveillance.consecutive_windows,weeklyBaselinePer100k:doc.surveillance.weekly_registered_srag_hospitalizations_per_100k_2025},
   vaccination:{enabled:false,availableDay:180,dosesPerDay:35,uptakeProbability:.75,daysToProtection:14,infectionProtectionFraction:.55,severeProtectionFraction:.60,priority:'older_first'},
@@ -145,9 +146,13 @@ export function makeCity(cfg){
   const home=add('household',region,homeId,visualHome,{householdIndex:house});
   homes.push(home);
   let groups=sampleHousehold(cfg,random);if(!groups.length)groups=['adult'];
-  const schoolChoice=()=>pickWeighted(byRegion[region].school,random)?.id??null;
-  const retailChoice=()=>pickWeighted(byRegion[region].retail,random)?.id??null;
-  const communityChoice=()=>pickWeighted(byRegion[region].community,random)?.id??null;
+  const capacityWeight=(r,kind)=>byRegion[r][kind].reduce((sum,x)=>sum+Math.max(1,Number(x.capacity)||1),0);
+  const chooseRegion=(homeRegion,kind,externalProbability)=>{
+   if(cfg.regions<2||random()>=externalProbability)return homeRegion;
+   const weights=byRegion.map((bucket,r)=>r===homeRegion?0:Math.max(1,capacityWeight(r,kind)));
+   const picked=weightedIndex(weights,random);
+   return picked<0?homeRegion:picked;
+  };
   for(const ageGroup of groups){
    if(agents.length>=cfg.population)break;
    const ageYears=sampleAgeYears(ageGroup,cfg,random);
@@ -156,16 +161,22 @@ export function makeCity(cfg){
    const healthWorker=working&&random()<(cfg.healthWorkerShare??0);
    const teacher=working&&!healthWorker&&random()<(cfg.teacherShare??0);
    const schoolEnrolled=ageYears>=6&&ageYears<=17&&random()<(cfg.schoolEnrollmentProbability??1);
-   const jobRegion=(healthWorker||teacher||random()>cfg.crossRegionWorkProbability)?region:(region+Math.ceil(cfg.regions/2))%cfg.regions;
+   const mix=cfg.cityMixing??{};
+   const schoolRegion=schoolEnrolled?chooseRegion(region,'school',mix.schoolExternalRegionProbability??.15):region;
+   const workKind=healthWorker?'hospital':teacher?'school':'work';
+   const jobRegion=working?chooseRegion(region,workKind,mix.workExternalRegionProbability??.40):region;
+   const marketRegion=chooseRegion(region,'retail',mix.retailExternalRegionProbability??.45);
+   const communityRegion=chooseRegion(region,'community',mix.communityExternalRegionProbability??.35);
+   const hospitalRegion=chooseRegion(region,'hospital',mix.hospitalExternalRegionProbability??.50);
+   const school=schoolEnrolled?(pickWeighted(byRegion[schoolRegion].school,random)?.id??null):null;
    const jobBuckets=byRegion[jobRegion];
-   const school=schoolEnrolled?schoolChoice():null;
    const work=healthWorker?(pickWeighted(jobBuckets.hospital,random)?.id??null):teacher?(pickWeighted(jobBuckets.school,random)?.id??null):(working?(pickWeighted(jobBuckets.work,random)?.id??null):null);
-   const market=retailChoice();
-   const community=communityChoice();
-   const hospital=pickWeighted(byRegion[region].hospital,random)?.id??null;
+   const market=pickWeighted(byRegion[marketRegion].retail,random)?.id??null;
+   const community=pickWeighted(byRegion[communityRegion].community,random)?.id??null;
+   const hospital=pickWeighted(byRegion[hospitalRegion].hospital,random)?.id??null;
    agents.push({
     id:agents.length,age:ageGroup,ageYears,region,home,visualHome,householdId:home,
-    school,schoolEnrolled,work,workRegion:jobRegion,market,community,hospital,
+    school,schoolRegion,schoolEnrolled,work,workRegion:jobRegion,market,marketRegion,community,communityRegion,hospital,hospitalRegion,
     healthWorker,teacher,working,compliance:random(),vaccineWilling:random(),
     state:'S',infectedDay:null,infectiousStartDay:null,onsetDay:null,symptomatic:null,
     symptomOnsetProcessed:false,outcomeDay:null,source:null,severe:false,severityAssessed:false,
@@ -208,7 +219,9 @@ export function simulate(config,options={}){
   target.infectiousStartDay=Math.max(day,target.onsetDay-(cfg.preSymptomaticDays??0));
   target.outcomeDay=target.onsetDay+cfg.infectiousDays;target.source=source;target.symptomatic=null;target.symptomOnsetProcessed=false;
   const actualPlace=place??target.home;
-  events.push({day,type:'infection',person:target.id,source,layer,place:actualPlace,visualPlace:visualPlaceOverride??visualOf(actualPlace),contactHours:hours,block});
+  const placeRegion=city.places.get(actualPlace)?.region??target.region;
+  const sourceRegion=source===null||source===undefined?null:P[source]?.region??null;
+  events.push({day,type:'infection',person:target.id,source,layer,place:actualPlace,visualPlace:visualPlaceOverride??visualOf(actualPlace),contactHours:hours,block,targetRegion:target.region,sourceRegion,placeRegion});
   transmissionByLayer[layer]=(transmissionByLayer[layer]||0)+1;
   return true;
  }
@@ -430,7 +443,9 @@ export function simulate(config,options={}){
    reportedCases:events.filter(e=>e.type==='reported_case').length,
    hospitalAdmissions:events.filter(e=>e.type==='hospital_admission').length,
    uniqueDeniedBed:deniedPeople.size,vaccinated:totalDoses,alertDay:alertDays[0]??null,
-   transmissionsByLayer:transmissionByLayer
+   transmissionsByLayer:transmissionByLayer,
+   regionsReached:new Set(events.filter(e=>e.type==='infection').map(e=>e.targetRegion).filter(Number.isInteger)).size,
+   crossRegionTransmissions:events.filter(e=>e.type==='infection'&&e.sourceRegion!==null&&e.sourceRegion!==e.targetRegion).length
   }
  };
 }
