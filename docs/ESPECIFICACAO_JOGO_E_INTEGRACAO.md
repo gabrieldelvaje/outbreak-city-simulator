@@ -1,17 +1,17 @@
 # OUTBREAK City — Especificação do jogo e integração ao motor (revisão v2)
 
-**Estado:** requisitos de produto e critérios de implementação; esta especificação não significa que a integração já esteja funcionando no site. O motor v1 em `simulator/engine.mjs` é independente do SVG, aceita de **10 a 30.000 agentes** e ainda usa regiões e travessias abstratas. **O máximo selecionável do jogo será 30.000 habitantes/agentes sintéticos** nesta versão; remover as referências anteriores a 100.000–500.000 e NÃO ampliar o teto apenas por configurar um campo de entrada. Renderizar nós agregados, não 30 mil bolinhas ao mesmo tempo. A capacidade final da interface depende de testes de desempenho em dispositivos reais.
+**Estado:** requisitos de produto e critérios de implementação; esta especificação não significa que a integração já esteja funcionando no site. O motor v1 em `simulator/engine.mjs` é independente do SVG, aceita de **10 a 20.000 agentes** e ainda usa regiões e travessias abstratas. **O máximo selecionável do jogo será 20.000 habitantes/agentes sintéticos** nesta versão; remover as referências anteriores a 100.000–500.000 e NÃO ampliar o teto apenas por configurar um campo de entrada. Renderizar nós agregados, não 20 mil bolinhas ao mesmo tempo. A capacidade final da interface depende de testes de desempenho em dispositivos reais.
 
 ## 1. Configuração e paciente zero
 
 1. O usuário escolhe uma população inteira entre 10 e 30.000 (limites idênticos aos efetivamente aceitos pelo motor), o perfil da doença, os parâmetros disponibilizados e uma semente opcional; a interface deve deixar clara a diferença entre perfil histórico parcialmente calibrado e cenário hipotético.
 2. O foco inicial é uma residência ou estabelecimento válido selecionado no mapa. O paciente zero deve morar ou estar presente ali; a escolha não pode produzir a primeira infecção em outro lugar. Escolas recebem alunos e funcionários efetivamente presentes; empresas recebem trabalhadores, e assim por diante. Rio, rua e pontes não são nós de transmissão.
-3. O usuário inicia, pausa, avança dias, altera velocidade e reinicia com a mesma configuração/seed. O motor deve registrar o encontro e o local que originaram cada transmissão posterior.
+3. Na experiência V0.7, a linha do tempo cobre 360 dias e avança continuamente em alta velocidade; o jogador pode pausar/reiniciar, e checkpoints de crise interrompem automaticamente o tempo. O motor deve registrar o encontro e o local que originaram cada transmissão posterior.
 
 ## 2. População, mapa e itinerários
 
 - Gerar população sintética por faixas etárias, domicílios, escolas, locais de trabalho e rotinas por dia da semana, explicitando distribuições assumidas e suas fontes. Marcadores de casa no SVG representam agregados de moradias virtuais quando necessário: mostrar a quantidade real de pessoas/domicílios associada a cada marcador.
-- Separar cálculo de renderização, preferencialmente usando Web Worker e atualizações agregadas; testar ao menos 100, 1.000, 10.000 e **30.000** agentes antes de liberar o seletor. Não renderizar todas as pessoas/arestas simultaneamente.
+- Separar cálculo de renderização, preferencialmente usando Web Worker e atualizações agregadas; testar ao menos 100, 1.000, 10.000 e **20.000** agentes antes de liberar o seletor. Não renderizar todas as pessoas/arestas simultaneamente.
 - Crianças em idade escolar vão às escolas, adultos empregados aos trabalhos, equipes essenciais aos hospitais, e viagens a mercados/comunidade dependem de agenda; pessoas internadas ou mortas não transitam normalmente. Fechamento de escola ou home office não extingue contatos domiciliares.
 - Ponte Norte, Central e Sul são **arestas de mobilidade**, nunca nós epidemiológicos. Fechar uma impede somente aquela travessia e obriga o recálculo de rotas pelos acessos restantes ou cancela o deslocamento. Os controles atuais do SVG ainda são visuais: não afirmar efeito epidemiológico até a integração efetiva.
 
@@ -47,6 +47,15 @@ Separar vacinação existente de P&D de vacina nova. Cobertura vacinal históric
 
 O balanço final inclui curva de estados S/E/I/H/R/D, incidência simulada e detectada, internações, sobrecarga, mortes sintéticas, custos, pontes/rotas, vacinação e decisões por data. Comparações de estratégias exigem condições iniciais compatíveis, múltiplas sementes e intervalos de resultados, sem alegar eficácia clínica ou política real.
 
-**Aceite antes de declarar integração concluída:** entrada máxima=30.000 aceita em motor e UI; paciente zero localizado no nó escolhido; duração de contatos entra de fato na equação; nenhuma transmissão sem contato ativo; conservação de N; hospitalizados/mortos sem mobilidade ordinária; serviços essenciais mantidos; pontes fechadas nunca usadas; intervenção altera agendas e contatos; parâmetros auditáveis e separação entre observado/estimado/hipotético; teste reprodutível e benchmark a 30 mil.
+**Aceite antes de declarar integração concluída:** entrada máxima=20.000 aceita em motor e UI; paciente zero localizado no nó escolhido; duração de contatos entra de fato na equação; nenhuma transmissão sem contato ativo; conservação de N; hospitalizados/mortos sem mobilidade ordinária; serviços essenciais mantidos; pontes fechadas nunca usadas; intervenção altera agendas e contatos; parâmetros auditáveis e separação entre observado/estimado/hipotético; teste reprodutível e benchmark a 20 mil.
 
 A metodologia detalhada do motor atual permanece em `simulator/docs/MODELO_E_METODOLOGIA.md`. A matriz de identificabilidade e as regras de calibração das fontes ficam em `docs/PARAMETROS_E_LIMITES_DAS_BASES.md`. **Esta revisão fixa o escopo e os requisitos científicos, não declara calibração concluída ou botões já conectados ao motor.**
+
+
+## 7. Revisão V0.7 da experiência
+
+A configuração inicial é modal sobre o mapa e contém nome da cidade, população (máximo 20.000) e vírus. A transmissibilidade da experiência jogável é sempre alta e não aparece como escolha do usuário.
+
+Depois da distribuição, o modal desaparece; o jogador escolhe paciente zero/epicentro no mapa e então inicia o surto. Somente nesse momento o HUD lateral é aberto.
+
+As decisões aparecem em modais de crise sobre o mapa. O calendário jogável possui quatro fases de onda ao longo de 360 dias e janelas posteriores para 1ª, 2ª e 3ª doses. Esses calendários são hipóteses de produto, não fatos epidemiológicos observados.
