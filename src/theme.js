@@ -1,3 +1,4 @@
+import './place-pins.js';
 // Switch only the site's visual theme; map geometry, data and controls are unchanged.
 const root=document.documentElement;
 const toggle=document.getElementById('theme-toggle');
