@@ -9,10 +9,11 @@
 .game-field input[type=number],.game-field select,.game-speed{width:100%;border:1px solid #dfe6e2;background:#fff;border-radius:8px;padding:8px;color:#33484f;font-size:11px}
 .game-focus{border:1px dashed #c9d3ce;border-radius:9px;padding:9px;font-size:11px;line-height:1.4;color:#52656b;background:#fff}
 .game-buttons{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
-.game-buttons button,.game-start,.game-decision-grid button{border:0;border-radius:8px;padding:9px 8px;font-size:10px;font-weight:750}
+.game-buttons button,.game-start,.game-prepare,.game-decision-grid button{border:0;border-radius:8px;padding:9px 8px;font-size:10px;font-weight:750}
 .game-start{width:100%;background:#243b48;color:#fff}
+.game-prepare{width:100%;background:#e9f1ed;color:#315c4a;border:1px solid #d3e3da!important;margin-top:5px}
 .game-buttons button{background:#eef3f0;color:#34494e}
-.game-buttons button:disabled,.game-start:disabled,.game-decision-grid button:disabled{opacity:.45;cursor:not-allowed}
+.game-buttons button:disabled,.game-start:disabled,.game-prepare:disabled,.game-decision-grid button:disabled{opacity:.45;cursor:not-allowed}
 .game-statusline{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#718187}
 .game-progress-track{height:4px;background:#e8eeea;border-radius:5px;overflow:hidden;margin-top:7px}
 .game-progress{height:100%;width:0;background:#d95d55;transition:width .18s linear}
@@ -55,4 +56,59 @@
   .game-stat{padding:5px}.game-stat b{font-size:12px}
   .game-decision-grid{grid-template-columns:repeat(3,1fr)}
   .sidebar>.section-label,.sidebar>.switch-row,.sidebar>#bridge-controls,.sidebar>.caveat,.sidebar>.sidebar-footer{display:none}
+}
+
+
+/* Persistent synthetic households and person selection */
+.residence-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:8px 0 12px}
+.residence-stats span{background:#f4f7f5;border-radius:8px;padding:8px;font-size:8px;color:#78888d}
+.residence-stats b{display:block;font-size:14px;color:#34484f;margin-bottom:2px}
+.household-select{display:grid;gap:5px;margin:8px 0 11px}
+.household-select>span{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#879599;font-weight:750}
+.household-select select{border:1px solid #dfe6e2;border-radius:8px;background:#fff;padding:8px;font-size:10px;color:#40535b}
+.household-header{display:grid;gap:2px;margin-bottom:5px}
+.household-header strong{font-size:11px;color:#34484f}
+.household-header small{font-size:9px;line-height:1.4;color:#819095}
+.household-graph-wrap{background:#f5f7f5;border-radius:10px;padding:5px;margin:8px 0}
+.household-graph{width:100%;height:165px;display:block}
+.household-link{stroke:#c7d1ce;stroke-width:1}
+.household-person-node{cursor:pointer}
+.household-person-node circle{stroke:#fff;stroke-width:2;filter:drop-shadow(0 1px 2px rgba(28,44,50,.15))}
+.household-person-node text{fill:#fff;font-size:8px;font-weight:800;pointer-events:none}
+.graph-caption{font-size:8.5px!important;color:#869499!important;line-height:1.45!important;margin:4px 5px 7px!important}
+.resident-list{display:grid;gap:5px;max-height:184px;overflow:auto;padding-right:2px}
+.resident-card{display:flex;align-items:center;gap:8px;text-align:left;width:100%;border:1px solid #e2e8e5;background:#fff;border-radius:8px;padding:7px;color:#3d5056}
+.resident-card:not(:disabled):hover{border-color:#b9ccc3;background:#f7faf8}
+.resident-card:disabled{cursor:default;opacity:.75}
+.resident-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+.resident-card span{display:grid;gap:2px}
+.resident-card strong{font-size:9.5px}
+.resident-card small{font-size:8px;color:#879599}
+.person-route{display:grid;gap:5px;margin-top:9px;padding:9px;border-radius:9px;background:#eef5f1;color:#405850}
+.person-route b{font-size:9px;text-transform:uppercase;letter-spacing:.06em}
+.person-route span{font-size:9.5px;line-height:1.45}
+.person-route small{font-size:8px;line-height:1.45;color:#71847b}
+#homes-layer .home-node[data-residents]::after{content:''}
+html[data-theme="dark"] .game-card{background:#18232e;border-color:#2a3947}
+html[data-theme="dark"] .game-field input[type=number],
+html[data-theme="dark"] .game-field select,
+html[data-theme="dark"] .game-speed,
+html[data-theme="dark"] .household-select select,
+html[data-theme="dark"] .game-focus,
+html[data-theme="dark"] .resident-card{background:#111b24;color:#e7edf1;border-color:#30404d}
+html[data-theme="dark"] .game-stat,
+html[data-theme="dark"] .residence-stats span,
+html[data-theme="dark"] .household-graph-wrap{background:#111b24}
+html[data-theme="dark"] .game-card h2,
+html[data-theme="dark"] .game-stat b,
+html[data-theme="dark"] .residence-stats b,
+html[data-theme="dark"] .household-header strong{color:#e4ebef}
+html[data-theme="dark"] .person-route{background:#173027;color:#d9eee3}
+html[data-theme="dark"] .game-prepare{background:#193229;color:#a9d4bc;border-color:#315143!important}
+
+@media(max-width:780px){
+  .resident-list{max-height:130px}
+  .household-graph{height:135px}
+  .residence-stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .residence-stats span{padding:5px}
 }
