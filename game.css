@@ -33,7 +33,7 @@
 .game-busy .status-dot{background:#d7a450;animation:gamePulse 1s infinite alternate}
 @keyframes gamePulse{to{opacity:.35}}
 .game-seed-target{filter:drop-shadow(0 0 5px rgba(214,67,57,.9))}
-#homes-layer .home-node.game-seed-target>circle:first-of-type{fill:#d74b45!important;opacity:1!important;r:7px}
+#homes-layer .home-node.game-seed-target>circle:first-of-type{fill:#d74b45!important;opacity:1!important}
 #homes-layer .home-node[data-game-level="1"]>circle:first-of-type{fill:#efb34f!important;opacity:.82!important}
 #homes-layer .home-node[data-game-level="2"]>circle:first-of-type{fill:#e77a45!important;opacity:.9!important;r:5.5px}
 #homes-layer .home-node[data-game-level="3"]>circle:first-of-type{fill:#d94e49!important;opacity:1!important;r:6.3px}
@@ -178,3 +178,29 @@ html[data-theme="dark"] .dose-row b{color:#e4ebef}
 }
 
 .workspace{position:relative}
+
+
+/* V0.8 — final comparison report */
+.game-modal--report{width:min(700px,calc(100% - 22px));max-height:min(760px,calc(100vh - 40px));overflow:auto}
+.report-comparison{display:grid;gap:7px;margin:14px 0}
+.report-row{border:1px solid #e2e8e5;border-radius:10px;padding:9px 10px;background:#f7f9f7}
+.report-row-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.report-row-head strong{font-size:10px;color:#33484f}
+.report-row-head span{font-size:9px;color:#718187;text-align:right}
+.report-row small{display:block;margin-top:4px;font-size:9px;line-height:1.4;color:#78888d}
+.report-row small[data-good="true"]{color:#2f7853}
+.report-row small[data-good="false"]{color:#a04b43}
+.report-decisions{margin-top:15px;padding-top:12px;border-top:1px solid #e5eae7}
+.report-decisions>strong{font-size:10px;color:#33484f}
+.report-decisions ul{margin:8px 0 0;padding-left:17px;font-size:9px;color:#708086;line-height:1.55;max-height:130px;overflow:auto}
+.report-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.report-actions .game-start,.report-actions .game-prepare{margin:0}
+html[data-theme="dark"] .report-row{background:#111b24;border-color:#2b3a46}
+html[data-theme="dark"] .report-row-head strong,
+html[data-theme="dark"] .report-decisions>strong{color:#e4ebef}
+html[data-theme="dark"] .report-decisions{border-color:#2a3947}
+
+@media(max-width:780px){
+  .report-row-head{display:grid;gap:3px}
+  .report-row-head span{text-align:left}
+}
