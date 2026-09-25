@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import {MODEL_VERSION,configFromProfile,makeCity,simulate,summarizeRuns} from './engine_v2.mjs';
-const params=JSON.parse(fs.readFileSync(new URL('./calibrated_parameters_v2.json',import.meta.url),'utf8'));
+import {MODEL_VERSION,configFromProfile,makeCity,simulate,summarizeRuns} from '../engine.mjs';
+const params=JSON.parse(fs.readFileSync(new URL('../data/calibrated_parameters_v2.json',import.meta.url),'utf8'));
 assert.equal(MODEL_VERSION,'2.0.0-data-informed');
 const base=configFromProfile(params,'medium',{population:600,days:45,seed:1234,pathogenId:'influenza'});
 assert.equal(base.population,600); assert.equal(base.crossRegionWorkProbability,0); assert.equal(base.hospitalContactScale,0);
