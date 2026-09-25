@@ -1,37 +1,63 @@
 # OUTBREAK — City Network Simulator
 
-Simulador experimental de transmissão em uma cidade **inteiramente fictícia**, com mapa vetorial 2D e um motor de infecção baseado em agentes sintéticos. A experiência pretende mostrar a defasagem entre transmissão invisível, sintomas, busca por atendimento, identificação do surto e decisões que mudam os contatos e a mobilidade.
+Simulador experimental de transmissão em uma cidade **inteiramente fictícia**, com mapa vetorial 2D e motor epidemiológico baseado em agentes sintéticos.
 
-## Mapa interativo (GitHub Pages)
+## Estado atual
 
-- Cidade 2D baseada na referência vetorial do projeto, com rio, três pontes, bairros, residências e locais públicos.
-- Zoom, seleção de locais, grafos ilustrativos e controles **ainda apenas visuais** das pontes.
-- Página: https://gabrieldelvaje.github.io/outbreak-city-simulator/
+- Mapa interativo publicado em GitHub Pages.
+- Motor matemático **v2 data-informed** em `simulator/engine.mjs`.
+- População configurável entre **10 e 30.000 agentes**.
+- Estrutura etária e matrizes de contato do Brasil, duração de contatos POLYMOD, comportamento PNAD COVID, progressão clínica SIVEP-Gripe 2025 e capacidade hospitalar CNES foram incorporados ao conjunto `simulator/data/calibrated_parameters_v2.json`.
+- O motor continua separado do SVG: paciente zero escolhido no mapa, rotas reais e bloqueio individual das três pontes ainda precisam ser conectados à simulação.
 
-## Motor matemático — implementação atual v1
+## Documentação científica
 
-O **código executável já está no repositório**: [simulator/README.md](simulator/README.md), [simulator/engine.mjs](simulator/engine.mjs), [parâmetros hipotéticos](simulator/data/hypothetical_profiles.json), [metodologia do motor v1](simulator/docs/MODELO_E_METODOLOGIA.md), [testes](simulator/tests/test_engine.mjs) e [linhagem histórica resumida](simulator/data/historical_provenance.json). É um protótipo estocástico individual com estados S/E/I/H/R/D, contatos por tipo de local, internação, detecção, vacinação e intervenções configuráveis. Permite entre **10 e 30.000 agentes**; este é o teto da próxima interface, condicionado a testes de desempenho no navegador.
+- [Análise e calibração v2](simulator/docs/CALIBRACAO_V2.md) — bases usadas, transformações, parâmetros, resultados, limitações e benchmark a 30 mil agentes.
+- [Modelo matemático e metodologia](simulator/docs/MODELO_E_METODOLOGIA.md) — equações, estados, rede, hospital, alerta e interpretação.
+- [Protocolo completo de vigilância, transmissão e decisões](docs/METODO_COMPLETO_VIGILANCIA_TRANSMISSAO_DECISOES.md).
+- [Especificação do jogo e integração](docs/ESPECIFICACAO_JOGO_E_INTEGRACAO.md).
+- [Parâmetros e limites das bases](docs/PARAMETROS_E_LIMITES_DAS_BASES.md).
 
-Para executar a partir da raiz do projeto (Node 20+):
+## Motor v2
+
+O motor combina uma rede temporal de contatos com estados `S/E/I/H/R/D`. Para cada suscetível, o risco diário acumulado usa:
+
+`P(infecção)=1-exp(-Σ beta × duração_do_contato × peso_da_amostragem × suscetibilidade × proteção)`.
+
+A frequência e mistura etária dos contatos vêm das matrizes brasileiras; a duração é sorteada por ambiente; a progressão até hospital/desfecho usa distribuições derivadas do SIVEP-Gripe 2025. O hospital pode emitir um **alerta de epidemia simulada** quando admissões excedem uma referência sazonal de SRAG do conjunto de parâmetros.
+
+**Importante:** `beta` absoluto, duração latente/infecciosa, eficácia vacinal e efeitos causais isolados de lockdown/escola/home office continuam como hipóteses de sensibilidade, porque as bases fornecidas não identificam esses valores diretamente.
+
+## Executar
+
+Da raiz do repositório, com Node 20+:
 
 ```bash
 node simulator/tests/test_engine.mjs
 node simulator/examples/run_example.mjs
 ```
 
-**Estado da integração:** o motor produz séries e eventos sintéticos **isoladamente**, mas não está associado às pessoas e construções do SVG. Os bloqueios de pontes no site ainda não recalculam rotas nem contágios. A v1 não implementa linha de base histórica de atendimentos hospitalares, transmissão por fase pré-sintomática separada, reinfecção ou importações externas; esses itens são requisitos da v2.
+No código:
 
-## Documentação científica e regras de jogo (além deste README)
+```js
+import {configFromProfile, simulate} from './simulator/engine.mjs';
 
-- **[Protocolo completo de vigilância, transmissão, decisões, reabertura, análise contrafactual e reprodutibilidade](docs/METODO_COMPLETO_VIGILANCIA_TRANSMISSAO_DECISOES.md)** — documento de referência da v2: define o hospital como sensor tardio, o alerta por atendimentos acima de uma linha de base comparável, as medidas como mudanças de rede (mantendo contatos familiares), a possibilidade condicional de nova onda, os indicadores finais e quais bases adicionais devem ser obtidas. Explicita fórmulas, variáveis, métodos, fontes, incertezas, testes e o **estado ainda não implementado**.
-- [Especificação da interface, grafo e 30 mil agentes](docs/ESPECIFICACAO_JOGO_E_INTEGRACAO.md).
-- [Parâmetros identificáveis e limites das bases fornecidas](docs/PARAMETROS_E_LIMITES_DAS_BASES.md).
-- [Modelo executável v1 e suas hipóteses](simulator/docs/MODELO_E_METODOLOGIA.md).
+const parameters = await fetch('./simulator/data/calibrated_parameters_v2.json').then(r => r.json());
+const config = configFromProfile(parameters, 'medium', {
+  population: 30000,
+  pathogenId: 'influenza',
+  seed: 42,
+  days: 180
+});
+const result = simulate(config);
+```
 
-**Diferença entre epidemia e pandemia:** o jogo se passa em uma única cidade e só pode emitir um **alerta fictício de epidemia local**. Não declarará uma pandemia mundial com base na ocupação de um hospital. A regra anterior de “20 casos por 100 mil/7 dias” era um exemplo demonstrativo e não deve ser tratada como limiar oficial ou linha de base observada. A v2 especifica comparação do volume de atendimentos respiratórios com o esperado para o mesmo sistema, estação e população de referência; depende de dados e validação antes de ser habilitada como método empírico.
+## Mapa
 
-**Limite científico:** as séries da OMS e as políticas OxCGRT são observações históricas; β por contato, incubation/contagiosidade, gravidade por idade, risco de óbito e eficácia causal das medidas **não estão calibrados automaticamente** com esses arquivos. Percentuais de casos evitados no jogo serão diferenças **entre distribuições de simulações**, não estimativas de efeitos reais de políticas. Não utilizar os resultados como previsão médica ou decisão sanitária real.
+Página: https://gabrieldelvaje.github.io/outbreak-city-simulator/
 
-## Publicação
+As pontes Norte, Central e Sul já possuem controles visuais no mapa. **Esses controles ainda não recalculam rotas do motor**; a integração espacial será a próxima etapa.
 
-GitHub Pages publica a raiz da branch `main`, usando `index.html`. O diretório `simulator/` funciona independentemente como módulo ES JavaScript no navegador ou Node, sem backend.
+## Limite científico
+
+O projeto é educacional e exploratório. Resultados são sintéticos e não constituem previsão médica, declaração epidemiológica oficial nem estimativa causal de políticas públicas reais.
