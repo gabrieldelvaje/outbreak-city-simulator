@@ -2713,6 +2713,15 @@
       "weekend": 0.72,
       "status": "GAME_ASSUMPTION_NOT_ESTIMATED_FROM_SUPPLIED_DATA",
       "explanation": "Used only to decide whether an agent performs a post-school/work community outing. Brazil contact matrices still determine expected contacts and POLYMOD determines duration shape. Replace these probabilities when a compatible Brazil time-use/mobility source is calibrated."
+    },
+    "city_mixing": {
+      "work_external_region_probability": 0.4,
+      "school_external_region_probability": 0.15,
+      "retail_external_region_probability": 0.45,
+      "community_external_region_probability": 0.35,
+      "hospital_external_region_probability": 0.5,
+      "status": "CITY_NETWORK_GAME_ASSUMPTION_NOT_ESTIMATED_FROM_SUPPLIED_DATA",
+      "explanation": "Probabilities control whether a persistent destination is selected outside the agent home district. They are used to keep the fictional city epidemiologically connected. Exact origin-destination shares are not identified by the supplied datasets and should be replaced if a compatible commuting/mobility OD source is calibrated."
     }
   },
   "calibration_notes": {
@@ -2721,6 +2730,7 @@
     "sivep_year_used_for_clinical_microdata": "2025 CSV supplied to the project. Frozen 2019-2024 Parquet files are retained as validation inputs but are not pooled into this parameter set until field harmonization across yearly schemas is run in an environment with Parquet support.",
     "cnes_capacity": "CNES values are registered beds in competence 202512, not real-time free beds. Engine capacity is a reference scenario and must be overridable.",
     "polymod": "POLYMOD supplies contact-duration distribution shape only; Brazil contact frequencies and age mixing come from the supplied Prem 2021 matrices.",
-    "pnad": "PNAD-COVID weights V1032 are used for population estimates. Social-distancing and remote-work measures are observed behavior indicators, not causal intervention efficacy."
+    "pnad": "PNAD-COVID weights V1032 are used for population estimates. Social-distancing and remote-work measures are observed behavior indicators, not causal intervention efficacy.",
+    "city_mixing": "The V0.4 city network intentionally mixes residents across districts through persistent work, school, retail, leisure and hospital destinations. The mixing shares are explicit game-network assumptions, not empirical Brazil or Piracicaba OD estimates."
   }
 }
