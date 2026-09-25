@@ -71,29 +71,36 @@ html:not([data-theme="dark"]) #places-layer .place-pin-shape {
 }
 
 
-/* Public-place names are no longer permanently printed under buildings. */
+
+
+/* Public-place names are never permanently printed below facilities. */
 #places-layer .place-label{
-  display:none;
+  display:none !important;
+  visibility:hidden !important;
 }
 
-/* Hover/focus interaction: the pin rises slightly and its name appears above it. */
+/* Pin hover/focus: lift the marker a few pixels and reveal a floating name card. */
 #places-layer .place-pin-art{
-  transform-box:fill-box;
-  transform-origin:center bottom;
-  transition:transform 180ms cubic-bezier(.2,.75,.25,1);
+  transform:translate(0,0);
+  transition:transform 190ms cubic-bezier(.2,.8,.25,1);
+  will-change:transform;
 }
 #places-layer .place-pin-tooltip{
   opacity:0;
-  transform-box:fill-box;
-  transform-origin:center bottom;
-  transition:opacity 140ms ease, transform 180ms cubic-bezier(.2,.75,.25,1);
+  visibility:hidden;
+  transition:opacity 130ms ease,visibility 0s linear 130ms;
+}
+#places-layer .place-pin-tooltip-float{
+  transform:translate(0,2px);
+  transition:transform 190ms cubic-bezier(.2,.8,.25,1);
 }
 #places-layer .place-pin-tooltip-bg{
   fill:#253442;
-  fill-opacity:.94;
+  fill-opacity:.96;
   stroke:#fff;
-  stroke-opacity:.18;
+  stroke-opacity:.2;
   stroke-width:.5;
+  filter:drop-shadow(0 1px 2px rgba(17,28,42,.22));
 }
 #places-layer .place-pin-tooltip-text{
   fill:#fff;
@@ -104,19 +111,24 @@ html:not([data-theme="dark"]) #places-layer .place-pin-shape {
 }
 #places-layer .map-place:hover > .place-pin .place-pin-art,
 #places-layer .map-place:focus-visible > .place-pin .place-pin-art{
-  transform:translateY(-4px);
+  transform:translate(0,-4px);
 }
 #places-layer .map-place:hover > .place-pin .place-pin-tooltip,
 #places-layer .map-place:focus-visible > .place-pin .place-pin-tooltip{
   opacity:1;
-  transform:translateY(-4px);
+  visibility:visible;
+  transition-delay:0s;
+}
+#places-layer .map-place:hover > .place-pin .place-pin-tooltip-float,
+#places-layer .map-place:focus-visible > .place-pin .place-pin-tooltip-float{
+  transform:translate(0,-2px);
 }
 
 html[data-theme="dark"] #places-layer .place-pin-tooltip-bg{
   fill:#111b28;
-  fill-opacity:.96;
+  fill-opacity:.97;
   stroke:#95a5ba;
-  stroke-opacity:.35;
+  stroke-opacity:.34;
 }
 html[data-theme="dark"] #places-layer .place-pin-tooltip-text{
   fill:#f4f7fb;
@@ -125,7 +137,8 @@ html[data-theme="dark"] #places-layer .place-pin-tooltip-text{
 
 @media (prefers-reduced-motion:reduce){
   #places-layer .place-pin-art,
-  #places-layer .place-pin-tooltip{
+  #places-layer .place-pin-tooltip,
+  #places-layer .place-pin-tooltip-float{
     transition:none;
   }
 }
