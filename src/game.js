@@ -17,7 +17,7 @@ const state={
   result:null,
   currentDay:0,
   timer:null,
-  speed:500,
+  speed:90,
   runToken:0,
   resumeDay:0,
   autoplay:true,
@@ -25,6 +25,8 @@ const state={
   vaccination:null,
   nodeEvents:[],
   decisions:[],
+  cityName:'Nova Aurora',
+  vaccinationCampaigns:[],
   decisionCheckpoints:[],
   acknowledgedCheckpoints:new Set(),
   currentDecisionCheckpoint:null
@@ -43,6 +45,13 @@ const stepButton=$('game-step');
 const resetButton=$('game-reset');
 const speedSelect=$('game-speed');
 const focusText=$('game-focus');
+const cityNameInput=$('game-city-name');
+const setupOverlay=$('setup-overlay');
+const epicenterOverlay=$('epicenter-overlay');
+const decisionOverlay=$('decision-overlay');
+const decisionTitle=$('decision-title');
+const decisionMessage=$('decision-message');
+const sidebar=$('game-sidebar');
 const message=$('game-message');
 const alertBox=$('game-alert');
 const alertText=$('game-alert-text');
@@ -68,7 +77,7 @@ function roleLabel(p){
 }
 
 function syncPopulation(source){
-  const n=clamp(Math.round(Number(source.value)||10),10,30000);
+  const n=clamp(Math.round(Number(source.value)||10),10,20000);
   populationRange.value=n;
   populationNumber.value=n;
 }
@@ -98,10 +107,10 @@ function getBaseSetup(){
   return {
     population:Number(populationNumber.value),
     regions:districts.length,
-    days:180,
+    days:360,
     seed:20260925,
     pathogenId:disease.value,
-    transmissibility:transmissibility.value,
+    transmissibility:'high',
     spatialModel:state.spatialModel
   };
 }
@@ -165,6 +174,7 @@ function clearPreparedPopulation(){
   state.nodeEvents=[];
   state.interventions=[];
   state.vaccination=null;
+  state.vaccinationCampaigns=[];
   state.decisions=[];
   state.decisionCheckpoints=[];
   state.acknowledgedCheckpoints=new Set();
@@ -176,14 +186,17 @@ function clearPreparedPopulation(){
   populationRange.disabled=false;
   populationNumber.disabled=false;
   prepareButton.textContent='Distribuir população';
+  setupOverlay.hidden=false;setupOverlay.classList.add('is-open');
+  epicenterOverlay.hidden=true;decisionOverlay.hidden=true;sidebar.classList.add('is-hidden');
   startButton.disabled=true;
-  focusText.textContent='Distribua a população primeiro';
+  focusText.textContent='Clique em uma residência ou local público e escolha uma pessoa no grafo.';
   inspector.hidden=true;
   $('game-status').textContent='Configuração da cidade';
-  announce('Defina o tamanho da população e distribua os agentes pela cidade.','');
+  announce('Configure sua cidade para começar.','');
 }
 
 function preparePopulation(){
+  state.cityName=(cityNameInput.value||'Nova Aurora').trim().slice(0,28)||'Nova Aurora';
   state.spatialModel=buildSpatialModel();
   if(!state.spatialModel.homes.length){
     announce('Os nós residenciais ainda não foram carregados. Tente novamente.','error');
@@ -301,6 +314,7 @@ function choosePatient(person,visualPlace,seedContext='home'){
   };
   focusText.textContent=`${personLabel(person)} · ${person.ageYears} anos · ${locationName(visualPlace)}`;
   startButton.disabled=false;
+  epicenterOverlay.classList.add('is-ready');
   announce('Paciente zero definido. Agora escolha a doença/transmissibilidade e inicie o surto.','ok');
 }
 
@@ -445,7 +459,8 @@ function getRunSetup(){
     initialSeedAgentId:state.selected.agentId,
     initialSeedPlaceId:state.selected.seedPlaceId,
     interventions:state.interventions,
-    vaccination:state.vaccination
+    vaccination:state.vaccination,
+    vaccinationCampaigns:state.vaccinationCampaigns
   };
 }
 
@@ -472,11 +487,14 @@ worker.onmessage=event=>{
     populationRange.disabled=true;populationNumber.disabled=true;
     prepareButton.textContent='Alterar população';
     state.selected=null;clearSeedSelection();decoratePopulation();
-    focusText.textContent='Abra uma residência e escolha uma pessoa';
+    focusText.textContent='Clique em uma residência ou local público e escolha uma pessoa no grafo.';
     startButton.disabled=true;setBusy(false);
+    setupOverlay.hidden=true;setupOverlay.classList.remove('is-open');
+    epicenterOverlay.hidden=false;epicenterOverlay.classList.remove('is-ready');
+    sidebar.classList.add('is-hidden');
     const homes=state.populationIndexes.byVisualHome.size;
     const households=state.populationIndexes.byHousehold.size;
-    $('game-status').textContent='População distribuída';
+    $('game-status').textContent='Escolha o epicentro';
     const crossDistrict=state.population.persons.filter(p=>(p.work&&p.workRegion!==p.region)||(p.school&&p.schoolRegion!==p.region)||(p.market&&p.marketRegion!==p.region)||(p.community&&p.communityRegion!==p.region)).length;
     announce(`${nfmt(state.population.persons.length)} agentes distribuídos em ${nfmt(households)} domicílios. ${nfmt(crossDistrict)} têm ao menos um destino habitual em outro bairro. Clique em uma casa.`,'ok');
     return;
@@ -552,7 +570,10 @@ function enterDecisionCheckpoint(checkpoint,d){
   stepButton.disabled=true;
   alertBox.classList.add('active');
   alertBox.dataset.severity=String(checkpoint.severity??1);
-  alertText.textContent=`${checkpoint.title} · ${checkpoint.message} Escolha uma medida ou “Continuar sem ação”.`;
+  alertText.textContent=`${checkpoint.title} · ${checkpoint.message}`;
+  decisionTitle.textContent=checkpoint.title;
+  decisionMessage.textContent=checkpoint.message;
+  decisionOverlay.hidden=false;decisionOverlay.classList.add('is-open');
   unlockDecisions(true,true);
   announce(`${checkpoint.title}. A linha do tempo foi pausada para uma nova decisão.`,'error');
 }
@@ -564,7 +585,8 @@ function renderDay(day){
   if(pending)targetDay=pending.day;
   state.currentDay=targetDay;
   const d=state.result.daily[state.currentDay];
-  $('game-day').textContent='Dia '+d.day;
+  $('game-day').textContent=`Dia ${String(d.day+1).padStart(3,'0')} / 360`;
+  $('game-wave').textContent=`${d.waveNumber||Math.min(4,Math.floor(d.day/90)+1)}ª onda`;
   $('game-active').textContent=nfmt(d.E+d.I+d.H);
   $('game-hospitalized').textContent=nfmt(d.H);
   $('game-deaths').textContent=nfmt(d.D);
@@ -572,9 +594,13 @@ function renderDay(day){
   $('game-attack').textContent=pct(d.cumulativeUniqueInfected,Number(populationNumber.value))+'%';
   $('game-new').textContent=nfmt(d.newInfections);
   $('game-reinfections').textContent=nfmt(d.cumulativeReinfections);
+  $('game-unmet-deaths').textContent=nfmt(d.cumulativeUnmetCareDeaths);
+  $('game-dose1').textContent=nfmt(d.cumulativeDose1);
+  $('game-dose2').textContent=nfmt(d.cumulativeDose2);
+  $('game-dose3').textContent=nfmt(d.cumulativeDose3);
   const reached=new Set(state.result.events.filter(e=>e.type==='infection'&&e.day<=state.currentDay&&Number.isInteger(e.targetRegion)).map(e=>e.targetRegion)).size;
   $('game-regions').textContent=`${reached} / ${districts.length}`;
-  $('game-progress').style.width=(state.currentDay/(state.result.daily.length-1)*100)+'%';
+  $('game-progress').style.width=(state.currentDay/359*100)+'%';
   $('game-progress').parentElement.setAttribute('aria-valuenow',String(state.currentDay));
   renderHeat(state.currentDay);
 
@@ -587,7 +613,7 @@ function renderDay(day){
     delete alertBox.dataset.severity;
     const occupancy=d.bedCapacity>0?Math.round(d.bedsOccupied/d.bedCapacity*100):0;
     alertText.textContent=`Epidemia em acompanhamento · ${nfmt(d.E+d.I+d.H)} casos ativos · ocupação hospitalar ${occupancy}% · ${reached} de ${districts.length} bairros atingidos.`;
-    unlockDecisions(true,false);
+    unlockDecisions(false,false);
   }else{
     state.currentDecisionCheckpoint=null;
     alertBox.classList.remove('active');
@@ -613,28 +639,36 @@ function pause(){
 }
 playButton.addEventListener('click',()=>state.phase==='running'?pause():play());
 stepButton.addEventListener('click',()=>{if(state.phase==='awaiting-decision')return;pause();if(state.result)renderDay(state.currentDay+1);});
-speedSelect.addEventListener('change',()=>{state.speed=Number(speedSelect.value);if(state.phase==='running')play();});
+speedSelect.addEventListener('change',()=>{state.speed=Number(speedSelect.value)||90;if(state.phase==='running')play();});
 
 function resetGame(){
   pause();
   state.phase='setup';state.population=null;state.populationIndexes=null;state.spatialModel=null;
-  state.selected=null;state.result=null;state.currentDay=0;state.interventions=[];state.vaccination=null;
+  state.selected=null;state.result=null;state.currentDay=0;state.interventions=[];state.vaccination=null;state.vaccinationCampaigns=[];
   state.decisions=[];state.nodeEvents=[];state.decisionCheckpoints=[];state.acknowledgedCheckpoints=new Set();state.currentDecisionCheckpoint=null;
   clearHeat();clearSeedSelection();clearPopulationDecorations();
   populationRange.disabled=false;populationNumber.disabled=false;prepareButton.disabled=false;
   prepareButton.textContent='Distribuir população';
   startButton.disabled=true;playButton.disabled=true;stepButton.disabled=true;
-  focusText.textContent='Distribua a população primeiro';
+  focusText.textContent='Clique em uma residência ou local público e escolha uma pessoa no grafo.';
   alertBox.classList.remove('active');alertText.textContent='O hospital ainda não detectou excesso de casos.';
   $('game-day').textContent='Dia —';
-  for(const id of ['game-active','game-hospitalized','game-deaths','game-new','game-regions','game-reinfections'])$(id).textContent='—';
+  for(const id of ['game-active','game-hospitalized','game-deaths','game-new','game-regions','game-reinfections','game-unmet-deaths'])$(id).textContent='—';
+  for(const id of ['game-dose1','game-dose2','game-dose3'])$(id).textContent='0';
+  $('game-wave').textContent='Onda —';
   $('game-beds').textContent='—';$('game-attack').textContent='—';$('game-progress').style.width='0%';
   decisionLog.replaceChildren();inspector.hidden=true;resetAppliedButtons();unlockDecisions(false);
-  $('game-status').textContent='Configuração da cidade';
+  setupOverlay.hidden=false;setupOverlay.classList.add('is-open');epicenterOverlay.hidden=true;decisionOverlay.hidden=true;sidebar.classList.add('is-hidden');
+  $('game-status').textContent='Aguardando configuração';
   announce('Defina o tamanho da população e distribua os agentes pela cidade.','');
 }
 resetButton.addEventListener('click',resetGame);
-startButton.addEventListener('click',()=>runSimulation({resumeDay:state.result?state.currentDay:0,autoplay:true}));
+startButton.addEventListener('click',()=>{
+  epicenterOverlay.hidden=true;
+  sidebar.classList.remove('is-hidden');
+  $('city-name-display').textContent=state.cityName;
+  runSimulation({resumeDay:state.result?state.currentDay:0,autoplay:true});
+});
 
 const ACTIONS={
   school:{label:'Fechar escolas',intervention:{type:'school_closure',fraction:1}},
@@ -643,10 +677,22 @@ const ACTIONS={
   retail:{label:'Restringir comércio',intervention:{type:'retail_limit',fraction:1}},
   lockdown:{label:'Lockdown',intervention:{type:'lockdown',fraction:1}}
 };
+function hasDose(n){return state.vaccinationCampaigns.some(c=>c.doseNumber===n);}
+function actionAllowed(action){
+  if(action==='vaccine1')return !hasDose(1);
+  if(action==='vaccine2')return hasDose(1)&&!hasDose(2);
+  if(action==='vaccine3')return hasDose(2)&&!hasDose(3);
+  return true;
+}
 function unlockDecisions(unlocked,allowNoAction=false){
+  const permitted=new Set(state.currentDecisionCheckpoint?.actions??[]);
   for(const button of decisionsRoot.querySelectorAll('button[data-action]')){
-    if(button.dataset.action==='none')button.disabled=!allowNoAction;
-    else button.disabled=!unlocked||button.dataset.applied==='true';
+    const action=button.dataset.action;
+    const inWindow=permitted.size===0||permitted.has(action);
+    const prerequisite=actionAllowed(action);
+    button.hidden=!inWindow||!prerequisite;
+    if(action==='none')button.disabled=!allowNoAction;
+    else button.disabled=!unlocked||!inWindow||!prerequisite||button.dataset.applied==='true';
   }
 }
 function addDecisionLog(label,day){
@@ -657,6 +703,7 @@ decisionsRoot.addEventListener('click',event=>{
   if(!button||button.disabled||!state.result)return;
   const action=button.dataset.action,startDay=Math.min(state.currentDay+1,state.result.daily.length-1);
   const checkpoint=acknowledgeDecisionCheckpoint();
+  decisionOverlay.hidden=true;decisionOverlay.classList.remove('is-open');
   if(action==='none'){
     const context=checkpoint?.title?` — ${checkpoint.title}`:'';
     state.decisions.push({day:state.currentDay,label:'Continuar sem ação'+context});
@@ -668,21 +715,32 @@ decisionsRoot.addEventListener('click',event=>{
     play();
     return;
   }
-  if(action==='vaccine'){
-    state.vaccination={
-      enabled:true,availableDay:startDay,dosesPerDay:Math.max(5,Math.round(Number(populationNumber.value)*.01)),
-      uptakeProbability:.75,daysToProtection:14,infectionProtectionFraction:.55,severeProtectionFraction:.60,priority:'older_first'
+  if(action==='beds'){
+    const currentBeds=state.result.daily[state.currentDay]?.bedCapacity||1;
+    const bedsDelta=Math.max(1,Math.ceil(currentBeds*.25));
+    state.interventions.push({type:'hospital_capacity_change',startDay,endDay:359,bedsDelta});
+    state.decisions.push({day:startDay,label:`Ampliar leitos (+${bedsDelta})`});addDecisionLog(`Ampliar leitos (+${bedsDelta})`,startDay);
+  }else if(action==='vaccine1'||action==='vaccine2'||action==='vaccine3'){
+    const doseNumber=Number(action.slice(-1));
+    const specs={
+      1:{daysToProtection:14,infectionProtectionFraction:.35,severeProtectionFraction:.50,minDaysSincePreviousDose:0},
+      2:{daysToProtection:10,infectionProtectionFraction:.62,severeProtectionFraction:.80,minDaysSincePreviousDose:28},
+      3:{daysToProtection:7,infectionProtectionFraction:.72,severeProtectionFraction:.90,minDaysSincePreviousDose:90}
     };
-    button.dataset.applied='true';state.decisions.push({day:startDay,label:'Iniciar vacinação (cenário)'});addDecisionLog('Iniciar vacinação (cenário)',startDay);
+    const campaign={enabled:true,doseNumber,availableDay:startDay,dosesPerDay:Math.max(5,Math.round(Number(populationNumber.value)*.015)),uptakeProbability:.82,priority:'older_first',...specs[doseNumber]};
+    state.vaccinationCampaigns.push(campaign);
+    button.dataset.applied='true';
+    const label=doseNumber===3?'Iniciar 3ª dose / reforço':`Iniciar ${doseNumber}ª dose`;
+    state.decisions.push({day:startDay,label});addDecisionLog(label,startDay);
   }else{
     const spec=ACTIONS[action];if(!spec)return;
-    state.interventions.push({...spec.intervention,startDay,endDay:179});
+    state.interventions.push({...spec.intervention,startDay,endDay:359});
     button.dataset.applied='true';state.decisions.push({day:startDay,label:spec.label});addDecisionLog(spec.label,startDay);
   }
   announce('Decisão aplicada a partir do próximo dia. Recalculando com a mesma população e paciente zero…','busy');
   runSimulation({resumeDay:state.currentDay,autoplay:true});
 });
-function resetAppliedButtons(){for(const button of decisionsRoot.querySelectorAll('button[data-action]'))delete button.dataset.applied;}
+function resetAppliedButtons(){for(const button of decisionsRoot.querySelectorAll('button[data-action]')){delete button.dataset.applied;button.hidden=false;}}
 
 $('inspector-close').addEventListener('click',()=>{inspector.hidden=true;});
 
