@@ -1,8 +1,8 @@
 # OUTBREAK — análise dos dados e calibração parcial do motor v2
 
 **Data da análise:** 25/09/2026  
-**Versão do conjunto de parâmetros:** `2.0.0`  
-**Versão do motor:** `2.0.0-data-informed`
+**Versão do conjunto de parâmetros:** `2.1.0`  
+**Versão do motor:** `2.1.0-spatial-routines`
 
 > Esta entrega substitui parte das hipóteses do motor v1 por distribuições e taxas derivadas diretamente das bases fornecidas ao projeto. A calibração é **parcial**: transmissão absoluta por hora, período latente/infeccioso, eficácia causal de políticas e eficácia vacinal não são identificáveis nos arquivos disponíveis e continuam como parâmetros de sensibilidade explicitamente marcados.
 
@@ -155,7 +155,7 @@ Por isso, `calibrated_parameters_v2.json` guarda esses valores em `scenario_assu
 - importação externa opcional para permitir reintrodução do patógeno após controle;
 - conservação `S+E+I+H+R+D=N` e reprodutibilidade por seed.
 
-Ainda falta conectar casas/locais/rotas do motor ao SVG real e individualizar as três pontes como arestas do grafo da interface.
+Casas e locais públicos agora são ligados ao SVG por `visualHome` e `visualPlace`. Ainda falta individualizar as três pontes como arestas reais e animar os trajetos pela malha viária.
 
 ## 11. Testes e desempenho
 
@@ -183,3 +183,16 @@ O repositório versiona:
 - documentação geral do modelo e protocolo de vigilância/decisão.
 
 Os microdados brutos não são copiados para o GitHub. Para reproduzir integralmente a calibração, é necessário usar os arquivos originais nas versões indicadas, preservar os pesos e filtros descritos e comparar o JSON produzido com o arquivo versionado. A próxima evolução do pipeline deve incluir harmonização explícita SIVEP 2019–2024 e uma baseline hospitalar multianual/local.
+## 13. Adendo v2.1 — topologia persistente e rotina diária
+
+A v2.1 mantém a calibração epidemiológica descrita acima, mas muda a materialização da rede para o jogo.
+
+Cada agente passa a ter `householdId`, `visualHome`, escola, trabalho, mercado, destino comunitário e hospital persistentes. Vários domicílios podem compartilhar um marcador residencial do SVG em populações grandes, porém apenas pessoas do mesmo `householdId` compartilham o contato familiar.
+
+O dia é dividido em `home_morning`, `daytime`, `evening_outing` e `home_night`. A camada interna `household` usa explicitamente a matriz e a distribuição de duração `home`.
+
+O conjunto de parâmetros passa a versionar `scenario_assumptions.routine_outing_probability`: 0,55 para dia útil e 0,72 para fim de semana. **Esses valores são hipóteses do jogo e não foram estimados das bases fornecidas.** Eles determinam apenas se haverá uma saída comunitária após escola/trabalho; a frequência de contatos continua vindo das matrizes brasileiras e a duração continua vindo do POLYMOD.
+
+Os eventos de infecção agora registram `block` e `visualPlace`, permitindo auditar se uma transmissão ocorreu em casa, escola, trabalho, varejo ou comunidade e projetar o evento no mapa real.
+
+Os testes automatizados também passam a verificar seleção exata do paciente zero, persistência da residência visual, blocos temporais e transmissão domiciliar usando a matriz `home`.
