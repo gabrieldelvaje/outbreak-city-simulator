@@ -15,7 +15,7 @@
 <body>
   <div class="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><strong>OUTBREAK</strong><small>CITY NETWORK SIMULATOR <span class="alpha">JOGO · V0.4</span></small></div></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><strong>OUTBREAK</strong><small>CITY NETWORK SIMULATOR <span class="alpha">JOGO · V0.5</span></small></div></div>
       <div class="top-actions"><span class="status-dot" aria-hidden="true"></span><span class="status-label" id="game-status">Configuração da cidade</span><button class="ghost" id="reset-view" type="button">Centralizar mapa</button><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Ativar modo escuro" aria-pressed="false" title="Ativar modo escuro"><span class="theme-toggle__icon" aria-hidden="true">☾</span><span class="theme-toggle__label">Modo escuro</span></button></div>
     </header>
 
@@ -48,6 +48,7 @@
               <div class="game-stat"><b id="game-deaths">—</b><small>Óbitos</small></div>
               <div class="game-stat"><b id="game-attack">—</b><small>Já infectados</small></div>
               <div class="game-stat"><b id="game-regions">—</b><small>Bairros atingidos</small></div>
+              <div class="game-stat"><b id="game-reinfections">—</b><small>Reinfecções</small></div>
             </div>
             <div class="game-legend"><span><i class="g1"></i>atividade baixa</span><span><i class="g2"></i>média</span><span><i class="g3"></i>alta</span></div>
           </section>
@@ -74,7 +75,7 @@
         <label class="switch-row"><span><b>Fluxos de mobilidade</b><small>Rotas ilustrativas entre as margens</small></span><input id="toggle-flows" type="checkbox"></label>
         <div class="section-label">PONTES</div>
         <div id="bridge-controls" class="bridge-controls"></div>
-        <p class="caveat">V0.4: trabalho, escola, comércio, lazer e hospital conectam residentes de bairros diferentes. As pontes ainda não recalculam rotas individualmente.</p>
+        <p class="caveat">V0.5: a cidade permanece conectada entre bairros e recuperados podem voltar a ficar suscetíveis, permitindo novas ondas e reinfecções. As pontes ainda não recalculam rotas individualmente.</p>
         <div class="sidebar-footer"><span class="chip"><i class="dot blue"></i> Rio central</span><span class="chip"><i class="dot green"></i> Parques</span><span class="chip"><i class="dot amber"></i> Vias principais</span></div>
       </aside>
 
