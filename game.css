@@ -176,3 +176,5 @@ html[data-theme="dark"] .dose-row b{color:#e4ebef}
   .epicenter-prompt .game-start{min-width:96px}
   .game-toast{bottom:8px}
 }
+
+.workspace{position:relative}
