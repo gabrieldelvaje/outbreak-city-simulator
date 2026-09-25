@@ -5,7 +5,7 @@
  * effects remain sensitivity assumptions where the supplied data do not identify them.
  * ES module, no runtime dependencies.
  */
-export const MODEL_VERSION='2.4.0-year-waves';
+export const MODEL_VERSION='2.5.0-severity-report';
 const AGE_GROUPS=['child','adult','older'];
 const AGE_INDEX={child:0,adult:1,older:2};
 const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
