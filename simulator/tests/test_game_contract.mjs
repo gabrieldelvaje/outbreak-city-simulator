@@ -12,6 +12,7 @@ for(const id of [
   'game-transmissibility','game-focus','game-start','game-play','game-step',
   'game-reset','game-speed','game-message','game-alert','game-decisions',
   'setup-overlay','epicenter-overlay','decision-overlay','decision-title','decision-message','game-sidebar',
+  'final-report-overlay','final-report-title','final-report-summary','final-report-comparison','final-report-decisions',
   'city-map','inspector','inspector-title','inspector-content'
 ]){
   assert.match(html,new RegExp('id=["\\\']'+id+'["\\\']'),'index.html must expose #'+id);
@@ -33,6 +34,10 @@ assert.ok(html.includes('data-action="none"'),'game must expose an explicit cont
 assert.ok(html.includes('data-action="beds"'),'crisis windows must allow hospital capacity expansion');
 assert.ok(html.includes('data-action="vaccine1"')&&html.includes('data-action="vaccine2"')&&html.includes('data-action="vaccine3"'),'game must expose staged vaccine doses');
 assert.ok(game.includes('vaccinationCampaigns'),'game must preserve staged vaccine campaigns across recalculations');
+assert.ok(worker.includes("message.type==='compare'"),'worker must support a no-action counterfactual comparison');
+assert.ok(worker.includes('interventions:[]')&&worker.includes('vaccinationCampaigns:[]'),'counterfactual must remove interventions and vaccination');
+assert.ok(game.includes('requestFinalReport')&&game.includes('renderFinalReport'),'game must request and render a final counterfactual report');
+assert.ok(game.includes("comparisonRow('Pessoas infectadas ao menos uma vez'"),'final report must compare dissemination as well as severity');
 assert.ok(game.includes("state.phase='awaiting-decision'"),'timeline must enter a mandatory decision state at crisis checkpoints');
 assert.ok(game.includes('buildDecisionCheckpoints'),'game must build escalating crisis checkpoints from simulation output');
 assert.ok(game.includes('acknowledgedCheckpoints'),'game must remember which crisis checkpoints were already answered');
