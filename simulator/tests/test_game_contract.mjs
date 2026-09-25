@@ -23,5 +23,9 @@ for(const token of [
 
 assert.ok(worker.includes("makeCity"),'worker must prepare the population before running the outbreak');
 assert.ok(game.includes("Distribua a população"),'game must require population generation before patient-zero selection');
+assert.ok(html.includes('data-action="none"'),'game must expose an explicit continue-without-action choice');
+assert.ok(game.includes("state.phase='awaiting-decision'"),'timeline must enter a mandatory decision state at the first hospital alert');
+assert.ok(game.includes("state.alertAcknowledged=true"),'an explicit choice must acknowledge the alert before time can continue');
+assert.ok(game.includes("if(!state.result||state.phase==='awaiting-decision')return"),'play control must be blocked while a hospital decision is pending');
 
 console.log('OUTBREAK game contract tests passed');
