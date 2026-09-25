@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f3f5f3">
-  <meta name="description" content="OUTBREAK: simule a propagação de um surto respiratório em uma cidade fictícia e tome decisões para contê-lo.">
+  <meta name="description" content="OUTBREAK: gerencie um ano de epidemia em uma cidade fictícia.">
   <title>OUTBREAK | City Network Simulator</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦠</text></svg>">
   <link rel="stylesheet" href="./styles.css">
@@ -15,69 +15,47 @@
 <body>
   <div class="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><strong>OUTBREAK</strong><small>CITY NETWORK SIMULATOR <span class="alpha">JOGO · V0.6</span></small></div></div>
-      <div class="top-actions"><span class="status-dot" aria-hidden="true"></span><span class="status-label" id="game-status">Configuração da cidade</span><button class="ghost" id="reset-view" type="button">Centralizar mapa</button><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Ativar modo escuro" aria-pressed="false" title="Ativar modo escuro"><span class="theme-toggle__icon" aria-hidden="true">☾</span><span class="theme-toggle__label">Modo escuro</span></button></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><strong>OUTBREAK</strong><small>CITY NETWORK SIMULATOR <span class="alpha">JOGO · V0.7</span></small></div></div>
+      <div class="top-actions"><span class="status-dot" aria-hidden="true"></span><span class="status-label" id="game-status">Aguardando configuração</span><button class="ghost" id="reset-view" type="button">Centralizar mapa</button><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Ativar modo escuro" aria-pressed="false"><span class="theme-toggle__icon" aria-hidden="true">☾</span><span class="theme-toggle__label">Modo escuro</span></button></div>
     </header>
 
     <main class="workspace">
-      <aside class="sidebar" aria-label="Controles da simulação">
-        <p class="eyebrow">01 / SIMULAR</p><h1>Comece o surto.<br>Controle a cidade.</h1>
-        <p class="intro">Primeiro distribua a população pela cidade. Depois abra uma residência, veja a família e escolha uma pessoa específica como paciente zero.</p>
+      <aside class="sidebar game-hud is-hidden" id="game-sidebar" aria-label="Painel da epidemia">
+        <p class="eyebrow">CIDADE</p>
+        <h1 id="city-name-display">—</h1>
+        <div class="game-statusline"><strong id="game-day">Dia —</strong><strong id="game-wave">Onda —</strong></div>
+        <div class="game-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="359" aria-valuenow="0"><div class="game-progress" id="game-progress"></div></div>
+        <div class="game-buttons game-buttons--hud"><button id="game-play" type="button" disabled>Pausar</button><button id="game-reset" type="button">Reiniciar</button><button id="game-step" type="button" hidden disabled>+1 dia</button></div>
+        <select id="game-speed" hidden><option value="90" selected>rápido</option></select>
 
-        <div class="game-panel">
-          <section class="game-card">
-            <h2>Configuração</h2>
-            <label class="game-field"><span>População sintética</span><div class="game-field-row"><input id="game-population" type="range" min="10" max="30000" step="10" value="5000"><input id="game-population-number" type="number" min="10" max="30000" step="10" value="5000"></div></label>
-            <label class="game-field"><span>Doença</span><select id="game-disease"><option value="influenza">Influenza</option><option value="covid19">COVID-19</option><option value="rsv">VSR</option></select></label>
-            <label class="game-field"><span>Transmissibilidade</span><select id="game-transmissibility"><option value="low">Baixa</option><option value="medium" selected>Média</option><option value="high">Alta</option></select></label>
-            <button class="game-prepare" id="game-prepare" type="button">Distribuir população</button>
-            <div class="game-focus-label">Paciente zero</div><div class="game-focus" id="game-focus">Distribua a população primeiro</div>
-            <button class="game-start" id="game-start" type="button" disabled>Iniciar surto</button>
-            <div class="game-message" id="game-message" aria-live="polite">Defina o tamanho da população e distribua os agentes pela cidade.</div>
-          </section>
+        <section class="game-card game-card--hud">
+          <h2>Indicadores</h2>
+          <div class="game-stats">
+            <div class="game-stat"><b id="game-active">—</b><small>Ativos</small></div>
+            <div class="game-stat"><b id="game-new">—</b><small>Novos/dia</small></div>
+            <div class="game-stat"><b id="game-hospitalized">—</b><small>Internados</small></div>
+            <div class="game-stat"><b id="game-beds">—</b><small>Leitos ocupados</small></div>
+            <div class="game-stat"><b id="game-deaths">—</b><small>Óbitos</small></div>
+            <div class="game-stat"><b id="game-unmet-deaths">—</b><small>Óbitos c/ falta de leito*</small></div>
+            <div class="game-stat"><b id="game-attack">—</b><small>Já infectados</small></div>
+            <div class="game-stat"><b id="game-regions">—</b><small>Bairros atingidos</small></div>
+            <div class="game-stat"><b id="game-reinfections">—</b><small>Reinfecções</small></div>
+          </div>
+          <p class="caveat">* Associação do modelo com dias sem atendimento, não atribuição causal individual.</p>
+        </section>
 
-          <section class="game-card">
-            <div class="game-statusline"><strong id="game-day">Dia —</strong><select id="game-speed" class="game-speed" aria-label="Velocidade"><option value="1000">1×</option><option value="500" selected>2×</option><option value="220">4×</option></select></div>
-            <div class="game-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="179" aria-valuenow="0"><div class="game-progress" id="game-progress"></div></div>
-            <div class="game-buttons"><button id="game-play" type="button" disabled>Continuar</button><button id="game-step" type="button" disabled>+1 dia</button><button id="game-reset" type="button">Reiniciar</button></div>
-            <div class="game-stats">
-              <div class="game-stat"><b id="game-active">—</b><small>Ativos</small></div>
-              <div class="game-stat"><b id="game-new">—</b><small>Novos/dia</small></div>
-              <div class="game-stat"><b id="game-hospitalized">—</b><small>Internados</small></div>
-              <div class="game-stat"><b id="game-beds">—</b><small>Leitos</small></div>
-              <div class="game-stat"><b id="game-deaths">—</b><small>Óbitos</small></div>
-              <div class="game-stat"><b id="game-attack">—</b><small>Já infectados</small></div>
-              <div class="game-stat"><b id="game-regions">—</b><small>Bairros atingidos</small></div>
-              <div class="game-stat"><b id="game-reinfections">—</b><small>Reinfecções</small></div>
-            </div>
-            <div class="game-legend"><span><i class="g1"></i>atividade baixa</span><span><i class="g2"></i>média</span><span><i class="g3"></i>alta</span></div>
-          </section>
+        <section class="game-card game-card--hud">
+          <h2>Vacinação</h2>
+          <div class="dose-row"><span>1ª dose</span><b id="game-dose1">0</b></div>
+          <div class="dose-row"><span>2ª dose</span><b id="game-dose2">0</b></div>
+          <div class="dose-row"><span>3ª dose / reforço</span><b id="game-dose3">0</b></div>
+        </section>
 
-          <section class="game-card">
-            <h2>Vigilância e decisões</h2>
-            <div class="game-alert" id="game-alert"><span id="game-alert-text">O hospital ainda não detectou excesso de casos.</span></div>
-            <div class="game-decision-grid" id="game-decisions">
-              <button type="button" data-action="school" disabled>Fechar escolas</button>
-              <button type="button" data-action="remote" disabled>Home office</button>
-              <button type="button" data-action="leisure" disabled>Fechar lazer</button>
-              <button type="button" data-action="retail" disabled>Restringir comércio</button>
-              <button type="button" data-action="lockdown" disabled>Lockdown</button>
-              <button type="button" data-action="vaccine" disabled>Vacinação*</button>
-              <button type="button" data-action="none" disabled>Continuar sem ação</button>
-            </div>
-            <ul class="game-decision-log" id="game-decision-log"></ul>
-            <p class="caveat">* Vacinação usa um cenário explícito de disponibilidade/proteção; não representa uma vacina real específica.</p>
-          </section>
-        </div>
-
-        <div class="section-label">CAMADAS DO MAPA</div>
-        <label class="switch-row"><span><b>Locais públicos</b><small>Escolas, hospitais, empresas e praças</small></span><input id="toggle-places" type="checkbox" checked></label>
-        <label class="switch-row"><span><b>Residências</b><small>Nós agregados por casa</small></span><input id="toggle-homes" type="checkbox" checked></label>
-        <label class="switch-row"><span><b>Fluxos de mobilidade</b><small>Rotas ilustrativas entre as margens</small></span><input id="toggle-flows" type="checkbox"></label>
-        <div class="section-label">PONTES</div>
-        <div id="bridge-controls" class="bridge-controls"></div>
-        <p class="caveat">V0.6: a linha do tempo pausa em marcos de piora — alerta inicial, aceleração, disseminação ampla, pressão hospitalar, capacidade crítica e novas ondas — até uma decisão ou a escolha de não agir.</p>
-        <div class="sidebar-footer"><span class="chip"><i class="dot blue"></i> Rio central</span><span class="chip"><i class="dot green"></i> Parques</span><span class="chip"><i class="dot amber"></i> Vias principais</span></div>
+        <section class="game-card game-card--hud">
+          <h2>Vigilância</h2>
+          <div class="game-alert" id="game-alert"><span id="game-alert-text">O hospital ainda não detectou excesso de casos.</span></div>
+          <ul class="game-decision-log" id="game-decision-log"></ul>
+        </section>
       </aside>
 
       <section class="map-shell" aria-label="Mapa interativo da cidade fictícia">
@@ -85,6 +63,52 @@
           <svg id="city-map" viewBox="0 0 1600 900" role="img" aria-label="Cidade fictícia com um surto respiratório simulado" xmlns="http://www.w3.org/2000/svg"><g id="map-world"></g></svg>
         </div>
         <div class="zoom-controls" aria-label="Zoom do mapa"><button id="zoom-in" type="button" aria-label="Aproximar">+</button><button id="zoom-out" type="button" aria-label="Afastar">−</button><button id="zoom-reset" type="button" aria-label="Redefinir zoom">⌖</button></div>
+
+        <div class="game-toast" id="game-message" aria-live="polite">Configure sua cidade para começar.</div>
+
+        <div class="game-overlay is-open" id="setup-overlay">
+          <div class="game-modal game-modal--setup">
+            <p class="eyebrow">OUTBREAK / UM ANO DE EPIDEMIA</p>
+            <h2>Bem-vindo à sua cidade.</h2>
+            <p>Você vai acompanhar 360 dias de uma epidemia respiratória, distribuída em quatro ciclos de onda, tomando decisões conforme a pressão sobre a cidade e os hospitais aumenta.</p>
+            <label class="game-field"><span>Nome da cidade</span><input id="game-city-name" type="text" maxlength="28" value="Nova Aurora" autocomplete="off"></label>
+            <label class="game-field"><span>População</span><div class="game-field-row"><input id="game-population" type="range" min="10" max="20000" step="10" value="5000"><input id="game-population-number" type="number" min="10" max="20000" step="10" value="5000"></div></label>
+            <label class="game-field"><span>Vírus</span><select id="game-disease"><option value="influenza">Influenza</option><option value="covid19">COVID-19</option><option value="rsv">VSR</option></select></label>
+            <select id="game-transmissibility" hidden><option value="high" selected>Alta</option></select>
+            <button class="game-start" id="game-prepare" type="button">Distribuir população</button>
+            <small class="modal-note">A transmissibilidade do jogo é fixada em alta. Os parâmetros continuam identificados como cenários quando não são estimados diretamente pelas bases.</small>
+          </div>
+        </div>
+
+        <div class="epicenter-prompt" id="epicenter-overlay" hidden>
+          <div>
+            <strong>Escolha o epicentro</strong>
+            <span id="game-focus">Clique em uma residência ou local público e escolha uma pessoa no grafo.</span>
+          </div>
+          <button class="game-start" id="game-start" type="button" disabled>Iniciar surto</button>
+        </div>
+
+        <div class="game-overlay" id="decision-overlay" hidden>
+          <div class="game-modal game-modal--decision">
+            <p class="eyebrow">SALA DE CRISE</p>
+            <h2 id="decision-title">Nova decisão</h2>
+            <p id="decision-message"></p>
+            <div class="game-decision-grid" id="game-decisions">
+              <button type="button" data-action="school">Fechar escolas</button>
+              <button type="button" data-action="remote">Home office</button>
+              <button type="button" data-action="leisure">Fechar lazer</button>
+              <button type="button" data-action="retail">Restringir comércio</button>
+              <button type="button" data-action="lockdown">Lockdown</button>
+              <button type="button" data-action="beds">Ampliar leitos</button>
+              <button type="button" data-action="vaccine1">Iniciar 1ª dose</button>
+              <button type="button" data-action="vaccine2">Aplicar 2ª dose</button>
+              <button type="button" data-action="vaccine3">Aplicar 3ª dose</button>
+              <button type="button" data-action="none">Continuar sem ação</button>
+            </div>
+            <small class="modal-note">As opções mostradas dependem do momento da epidemia e das decisões já tomadas.</small>
+          </div>
+        </div>
+
         <div class="inspector" id="inspector" hidden><div class="inspector-heading"><span id="inspector-type">LOCAL</span><button type="button" id="inspector-close" aria-label="Fechar painel">×</button></div><h2 id="inspector-title"></h2><p id="inspector-desc"></p><div id="inspector-content"></div></div>
       </section>
     </main>
