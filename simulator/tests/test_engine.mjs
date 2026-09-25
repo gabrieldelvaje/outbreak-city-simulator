@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {MODEL_VERSION,configFromProfile,makeCity,simulate,summarizeRuns} from '../engine.mjs';
 const params=JSON.parse(fs.readFileSync(new URL('../data/calibrated_parameters_v2.json',import.meta.url),'utf8'));
-assert.equal(MODEL_VERSION,'2.4.0-year-waves');
+assert.equal(MODEL_VERSION,'2.5.0-severity-report');
 const base=configFromProfile(params,'medium',{population:600,days:45,seed:1234,pathogenId:'influenza'});
 const annual=configFromProfile(params,'high',{population:600,seed:1234,pathogenId:'influenza'});
 assert.equal(annual.days,360,'playable annual profile must cover 360 days');
@@ -121,6 +121,14 @@ const lethalClinical={...base.clinicalProfile,death_fraction_given_hospitalized:
 const noBeds=simulate({...base,seed:707,days:55,beta:0,initialInfections:30,latentDays:1,infectiousDays:30,symptomaticProbability:1,severeProbabilityByAge:{child:1,adult:1,older:1},beds:0,clinicalProfile:lethalClinical,externalImportationRatePerDay:0});
 assert.ok(noBeds.summary.uniqueDeniedBed>0,'zero capacity must deny care to severe cases');
 assert.ok(noBeds.summary.unmetCareDeaths>0,'deaths after denied care must be tracked separately');
+const noActionAnnual=simulate(configFromProfile(params,'high',{
+  population:3000,days:360,seed:20260925,pathogenId:'influenza',regions:7,
+  interventions:[],vaccinationCampaigns:[],vaccination:{enabled:false,availableDay:999,dosesPerDay:0,uptakeProbability:0,daysToProtection:14,infectionProtectionFraction:0,severeProtectionFraction:0,priority:'older_first'}
+}));
+assert.ok(noActionAnnual.summary.hospitalAdmissions>=50,'annual no-action high-transmission campaign must create consequential hospital demand');
+assert.ok(noActionAnnual.summary.finalDeaths>=10,'annual no-action high-transmission campaign must create consequential mortality');
+assert.ok(noActionAnnual.summary.uniqueDeniedBed>0,'annual no-action campaign must be capable of exhausting baseline beds');
+assert.ok(noActionAnnual.summary.unmetCareDeaths>0,'annual no-action campaign must record deaths after unmet severe-care demand');
 const maxPopulationCfg=configFromProfile(params,'low',{population:20000,days:1,seed:9090,pathogenId:'influenza',regions:2,spatialModel});
 const maxPopulationCity=makeCity(maxPopulationCfg);
 assert.equal(maxPopulationCity.agents.length,20000,'maximum configured population must be constructible');
