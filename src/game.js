@@ -239,7 +239,7 @@ function personCard(p,selectable=true){
   return button;
 }
 
-function drawHouseholdGraph(people,selectable){
+function drawHouseholdGraph(people,selectable,onSelect){
   const wrap=document.createElement('div');wrap.className='household-graph-wrap';
   const NS='http://www.w3.org/2000/svg';
   const graph=document.createElementNS(NS,'svg');
@@ -258,7 +258,15 @@ function drawHouseholdGraph(people,selectable){
   }
   for(const point of pts){
     const g=document.createElementNS(NS,'g');g.setAttribute('class','household-person-node');
-    g.dataset.agent=String(point.p.id);if(selectable)g.setAttribute('tabindex','0');
+    g.dataset.agent=String(point.p.id);
+    if(selectable){
+      g.setAttribute('tabindex','0');g.setAttribute('role','button');
+      g.setAttribute('aria-label',`${personLabel(point.p)}, ${point.p.ageYears} anos`);
+      g.addEventListener('click',()=>onSelect?.(point.p));
+      g.addEventListener('keydown',event=>{
+        if(event.key==='Enter'||event.key===' '){event.preventDefault();onSelect?.(point.p);}
+      });
+    }
     const circle=document.createElementNS(NS,'circle');
     circle.setAttribute('cx',point.x);circle.setAttribute('cy',point.y);circle.setAttribute('r','14');
     circle.setAttribute('fill',AGE_COLOR[point.p.age]||'#819197');
@@ -298,7 +306,10 @@ function renderHouseholdPanel(homeId,householdId){
   const counts={child:0,adult:0,older:0};people.forEach(p=>counts[p.age]++);
   summary.textContent=`${people.length} moradores · ${counts.adult} adultos · ${counts.child} crianças/adolescentes · ${counts.older} idosos`;
   householdHeader.append(title,summary);root.append(householdHeader);
-  root.append(drawHouseholdGraph(people,!state.result));
+  root.append(drawHouseholdGraph(people,!state.result,p=>{
+    choosePatient(p,homeId,'home');
+    openResidenceInspector(homeId,householdId);
+  }));
   const list=document.createElement('div');list.className='resident-list';
   for(const p of people){
     const card=personCard(p,!state.result);
