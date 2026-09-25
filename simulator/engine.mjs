@@ -66,7 +66,7 @@ export function configFromProfile(doc,level='medium',overrides={}){
   interventions:[]};
  const cfg={...defaults,...overrides,beta,pathogenId};
  cfg.alert={...defaults.alert,...overrides.alert};cfg.vaccination={...defaults.vaccination,...overrides.vaccination};cfg.interventions=overrides.interventions??[];
- cfg.severeProbabilityByAge={...defaults.severeProbabilityByAge,...overrides.severeProbabilityByAge};cfg.relativeSusceptibilityByAge={...defaults.relativeSusceptibilityByAge,...overrides.relativeSusceptibilityByAge};
+ cfg.severeProbabilityByAge={...defaults.severeProbabilityByAge,...overrides.severeProbabilityByAge};cfg.relativeSusceptibilityByAge={...defaults.relativeSusceptibilityByAge,...overrides.relativeSusceptibilityByAge};cfg.cityMixing={...defaults.cityMixing,...overrides.cityMixing};
  return requireValid(cfg);
 }
 function ageGroupFromYears(age){return age<=17?'child':age<=64?'adult':'older';}
