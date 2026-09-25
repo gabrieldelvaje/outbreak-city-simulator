@@ -2,9 +2,9 @@
 
 Simulador experimental de transmissão em uma cidade **inteiramente fictícia**, com mapa vetorial 2D e motor epidemiológico baseado em agentes sintéticos.
 
-## Versão jogável atual — V0.5
+## Versão jogável atual — V0.6
 
-A V0.5 mantém a população persistente, a mobilidade entre bairros e acrescenta **perda de imunidade natural, reinfecções e reintroduções externas**, permitindo que a epidemia produza novas ondas mesmo quando a primeira curva cai.
+A V0.6 mantém população persistente, mobilidade interbairros, reinfecções e novas ondas e acrescenta **pausas progressivas de decisão conforme a situação piora**.
 
 O fluxo atual é: escolher entre **10 e 30.000 agentes** → distribuir a população → abrir uma residência → inspecionar domicílios e grafo familiar → escolher uma pessoa específica como paciente zero → iniciar a epidemia → acompanhar disseminação e novas ondas → tomar decisões após o alerta hospitalar.
 
@@ -53,10 +53,25 @@ Elas são mecânicas de cenário do jogo, não estimativas clínicas.
 - Parâmetros: [`simulator/data/calibrated_parameters_v2.json`](simulator/data/calibrated_parameters_v2.json)
 - Análise/calibração: [`simulator/docs/CALIBRACAO_V2.md`](simulator/docs/CALIBRACAO_V2.md)
 - Metodologia: [`simulator/docs/MODELO_E_METODOLOGIA.md`](simulator/docs/MODELO_E_METODOLOGIA.md)
-- Jogo V0.5: [`docs/JOGO_V0_5.md`](docs/JOGO_V0_5.md)
+- Jogo V0.6: [`docs/JOGO_V0_6.md`](docs/JOGO_V0_6.md)
 - Testes: [`simulator/tests/test_engine.mjs`](simulator/tests/test_engine.mjs)
 
 **Versão do motor:** `2.3.0-reinfection-waves`.
+
+## Pausas progressivas de decisão
+
+Depois que o hospital detecta a epidemia, o jogo não oferece apenas uma decisão inicial. A linha do tempo pode parar novamente quando o cenário cruza marcos de piora:
+
+- alerta hospitalar inicial;
+- aceleração da transmissão;
+- disseminação ampla pelos bairros;
+- ocupação hospitalar de pelo menos 50%;
+- ocupação hospitalar de pelo menos 80%;
+- recrudescimento/nova onda após uma queda importante.
+
+Em cada pausa, o jogador escolhe uma medida disponível ou **Continuar sem ação**. Sem uma escolha explícita, o tempo não avança.
+
+Os limiares adicionais são regras de progressão do jogo e não critérios epidemiológicos oficiais.
 
 ## Limitações atuais
 
