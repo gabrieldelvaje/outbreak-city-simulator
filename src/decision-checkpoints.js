@@ -34,9 +34,9 @@ export function buildDecisionCheckpoints(result,{districtCount=7}={}){
   // Four game-wave phases across the 360-day campaign.
   add({id:'wave-2',day:90,severity:2,anchor:true,title:'A 2ª onda está começando',message:'A pressão de transmissão voltou a subir no segundo ciclo anual. A primeira dose da vacina já pode ser iniciada neste cenário.',actions:['vaccine1','school','remote','retail','lockdown','none']});
   add({id:'dose-2-window',day:135,severity:2,anchor:true,title:'Janela para a 2ª dose',message:'A campanha pode avançar para a segunda dose entre pessoas que receberam a primeira e cumpriram o intervalo mínimo.',actions:['vaccine2','beds','remote','retail','none']});
-  add({id:'wave-3',day:180,severity:2,anchor:true,title:'A 3ª onda está começando',message:'Uma nova fase de circulação começou. Reavalie restrições, capacidade hospitalar e cobertura vacinal.',actions:['beds','school','remote','retail','lockdown','none']});
-  add({id:'dose-3-window',day:225,severity:2,anchor:true,title:'Dose de reforço para novas cepas',message:'O cenário libera uma terceira dose/booster com proteção ampliada contra formas graves e novas variantes simuladas.',actions:['vaccine3','beds','retail','none']});
-  add({id:'wave-4',day:270,severity:3,anchor:true,title:'A 4ª onda está começando',message:'O último ciclo anual começou. A cidade entra na fase final com imunidade, reinfecções, vacinação e políticas acumuladas.',actions:['beds','school','remote','retail','lockdown','none']});
+  add({id:'wave-3',day:180,severity:2,anchor:true,title:'A 3ª onda está começando',message:'Uma nova fase de circulação começou. Reavalie restrições, capacidade hospitalar e cobertura vacinal.',actions:['vaccine1','vaccine2','beds','school','remote','retail','lockdown','none']});
+  add({id:'dose-3-window',day:225,severity:2,anchor:true,title:'Dose de reforço para novas cepas',message:'O cenário libera uma terceira dose/booster com proteção ampliada contra formas graves e novas variantes simuladas.',actions:['vaccine2','vaccine3','beds','retail','none']});
+  add({id:'wave-4',day:270,severity:3,anchor:true,title:'A 4ª onda está começando',message:'O último ciclo anual começou. A cidade entra na fase final com imunidade, reinfecções, vacinação e políticas acumuladas.',actions:['vaccine1','vaccine2','vaccine3','beds','school','remote','retail','lockdown','none']});
 
   if(Number.isInteger(firstAlert)){
     const minActive=Math.max(5,Math.round(population*.003));
@@ -90,7 +90,10 @@ export function buildDecisionCheckpoints(result,{districtCount=7}={}){
     if(!previous){kept.push(c);continue;}
     const gap=c.day-previous.day;
     if(gap<21&&!c.anchor&&!c.critical)continue;
-    if(gap<10&&c.anchor&&previous.anchor)continue;
+    if(gap<21&&c.anchor&&!c.critical){
+      kept.push({...c,day:Math.min(daily.length-1,previous.day+21)});
+      continue;
+    }
     kept.push(c);
   }
   return kept;
