@@ -2741,6 +2741,74 @@
         "natural_immunity_days_max": 90,
         "external_importation_attempts_per_1000_per_day": 0.02
       }
+    },
+    "annual_wave_schedule": [
+      {
+        "wave": 1,
+        "startDay": 0,
+        "endDay": 89,
+        "peak_day": 35,
+        "peakTransmissionMultiplier": 1.35,
+        "troughTransmissionMultiplier": 0.58,
+        "importationMultiplier": 1.4,
+        "label": "1ª onda"
+      },
+      {
+        "wave": 2,
+        "startDay": 90,
+        "endDay": 179,
+        "peak_day": 125,
+        "peakTransmissionMultiplier": 1.25,
+        "troughTransmissionMultiplier": 0.55,
+        "importationMultiplier": 1.25,
+        "label": "2ª onda"
+      },
+      {
+        "wave": 3,
+        "startDay": 180,
+        "endDay": 269,
+        "peak_day": 215,
+        "peakTransmissionMultiplier": 1.12,
+        "troughTransmissionMultiplier": 0.52,
+        "importationMultiplier": 1.15,
+        "label": "3ª onda"
+      },
+      {
+        "wave": 4,
+        "startDay": 270,
+        "endDay": 359,
+        "peak_day": 305,
+        "peakTransmissionMultiplier": 1.08,
+        "troughTransmissionMultiplier": 0.5,
+        "importationMultiplier": 1.1,
+        "label": "4ª onda"
+      }
+    ],
+    "annual_wave_schedule_status": "GAME_SCENARIO_SHAPE_NOT_ESTIMATED_FROM_SUPPLIED_DATA",
+    "annual_wave_schedule_explanation": "Four 90-day game phases are used over the 360-day campaign. Multipliers modulate the already-high transmissibility sensitivity scenario and external introductions; they are not epidemiological forecasts.",
+    "unmet_care_mortality_per_denied_day": 0.18,
+    "unmet_care_mortality_status": "GAME_SEVERITY_ASSUMPTION_NOT_IDENTIFIED_FROM_SUPPLIED_DATA",
+    "vaccine_dose_scenarios": {
+      "status": "GAME_ASSUMPTION_NOT_PRODUCT_SPECIFIC",
+      "dose1": {
+        "days_to_protection": 14,
+        "infection_protection_fraction": 0.35,
+        "severe_protection_fraction": 0.5,
+        "min_days_since_previous_dose": 0
+      },
+      "dose2": {
+        "days_to_protection": 10,
+        "infection_protection_fraction": 0.62,
+        "severe_protection_fraction": 0.8,
+        "min_days_since_previous_dose": 28
+      },
+      "dose3": {
+        "days_to_protection": 7,
+        "infection_protection_fraction": 0.72,
+        "severe_protection_fraction": 0.9,
+        "min_days_since_previous_dose": 90
+      },
+      "note": "Dose 3 represents an updated/booster scenario for later variants/strains. Values are not estimates for a specific vaccine."
     }
   },
   "calibration_notes": {
@@ -2751,6 +2819,8 @@
     "polymod": "POLYMOD supplies contact-duration distribution shape only; Brazil contact frequencies and age mixing come from the supplied Prem 2021 matrices.",
     "pnad": "PNAD-COVID weights V1032 are used for population estimates. Social-distancing and remote-work measures are observed behavior indicators, not causal intervention efficacy.",
     "city_mixing": "The V0.4 city network intentionally mixes residents across districts through persistent work, school, retail, leisure and hospital destinations. The mixing shares are explicit game-network assumptions, not empirical Brazil or Piracicaba OD estimates.",
-    "reinfection_waves": "Recovered agents temporarily enter R and later return to S according to pathogen-specific game-scenario windows. External introductions are modeled as exposure attempts scaled by population; vaccine protection can block a successful imported infection. These settings are scenario mechanics, not estimates from WHO/SIVEP/OxCGRT/PNAD/POLYMOD."
+    "reinfection_waves": "Recovered agents temporarily enter R and later return to S according to pathogen-specific game-scenario windows. External introductions are modeled as exposure attempts scaled by population; vaccine protection can block a successful imported infection. These settings are scenario mechanics, not estimates from WHO/SIVEP/OxCGRT/PNAD/POLYMOD.",
+    "annual_game_campaign": "The playable campaign now spans 360 days in four approximately 90-day wave phases. This resolves the game-design request for four waves in one simulated year; supplied datasets do not support a deterministic four-wave calendar.",
+    "unmet_care": "Severe cases denied a bed accumulate denied-care days. Mortality risk is increased by an explicit scenario multiplier per denied day. This is a game-model consequence of capacity shortage, not a causal estimate of a real policy."
   }
 }
