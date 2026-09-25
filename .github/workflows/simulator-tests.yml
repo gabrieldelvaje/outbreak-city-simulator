@@ -28,11 +28,14 @@ jobs:
         run: |
           node --check simulator/engine.mjs
           node --check src/game.js
+          node --check src/decision-checkpoints.js
           node --check src/simulation-worker.js
           node --check src/map.js
       - name: Test epidemiological engine invariants
         run: node simulator/tests/test_engine.mjs
       - name: Test game integration contract
         run: node simulator/tests/test_game_contract.mjs
+      - name: Test escalating decision checkpoints
+        run: node simulator/tests/test_decision_checkpoints.mjs
       - name: Run reproducible demonstration
         run: node simulator/examples/run_example.mjs > /dev/null
