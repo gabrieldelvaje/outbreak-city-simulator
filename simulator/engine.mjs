@@ -187,55 +187,247 @@ function durationSample(cfg,layer,rand){let key=layer==='retail'||layer==='hospi
 function matrixForLayer(cfg,layer){let key=layer;if(layer==='retail'||layer==='hospital')key='community';const m=cfg.contactMatrices?.[key];if(!m)return null;let scale=1;if(layer==='retail')scale=cfg.communityAllocation?.retail??.44;else if(layer==='community')scale=cfg.communityAllocation?.community??.56;else if(layer==='hospital')scale=cfg.hospitalContactScale??0;return m.map(row=>row.map(x=>x*scale));}
 function alertExpected(cfg,day){const week=((cfg.startEpiWeek-1+Math.floor(day/7))%52)+1;const rate=Number(cfg.alert.weeklyBaselinePer100k?.[String(week)]??0);return {week,expected:rate*cfg.population/100000};}
 export function simulate(config,options={}){
- const cfg=requireValid(structuredClone(config)),rand=rng((cfg.seed^0x9e3779b9)>>>0),city=makeCity(cfg),P=city.agents;const events=[],daily=[],reports=new Map(),transmissionByLayer={},alertDays=[];
+ const cfg=requireValid(structuredClone(config));
+ const rand=rng((cfg.seed^0x9e3779b9)>>>0);
+ const city=makeCity(cfg),P=city.agents;
+ const events=[],daily=[],reports=new Map(),transmissionByLayer={},alertDays=[];
  const seedRegion=Number.isInteger(cfg.initialSeedRegion)?Math.max(0,Math.min(cfg.regions-1,cfg.initialSeedRegion)):null;
  const seedContext=cfg.initialSeedContext??(cfg.initialInfectionMode==='child_at_home'?'home':'random');
- function seedPlaceFor(person){
-  const r=seedRegion??person.region;
-  if(seedContext==='school')return city.schools[r];
-  if(seedContext==='work')return city.workplaces[r];
-  if(seedContext==='retail')return city.markets[r];
-  if(seedContext==='community')return city.parks[r];
-  if(seedContext==='hospital')return city.hospitals[r];
+ const visualOf=place=>city.places.get(place)?.visualId??place;
+ const placeForContext=(person,context)=>{
+  if(context==='school')return person.school??person.home;
+  if(context==='work')return person.work??person.home;
+  if(context==='retail')return person.market??person.home;
+  if(context==='community')return person.community??person.home;
+  if(context==='hospital')return person.hospital??person.work??person.home;
   return person.home;
+ };
+ function infect(target,day,source,layer,place=null,hours=null,block=null,visualPlaceOverride=null){
+  if(!target||target.state!=='S')return false;
+  target.state='E';target.infectedDay=day;target.onsetDay=day+cfg.latentDays;
+  target.infectiousStartDay=Math.max(day,target.onsetDay-(cfg.preSymptomaticDays??0));
+  target.outcomeDay=target.onsetDay+cfg.infectiousDays;target.source=source;target.symptomatic=null;target.symptomOnsetProcessed=false;
+  const actualPlace=place??target.home;
+  events.push({day,type:'infection',person:target.id,source,layer,place:actualPlace,visualPlace:visualPlaceOverride??visualOf(actualPlace),contactHours:hours,block});
+  transmissionByLayer[layer]=(transmissionByLayer[layer]||0)+1;
+  return true;
  }
  let candidates=P;
  if(seedRegion!==null)candidates=candidates.filter(p=>p.region===seedRegion);
- if(seedContext==='school')candidates=candidates.filter(p=>p.school===city.schools[seedRegion??p.region]||p.teacher);
- else if(seedContext==='work')candidates=candidates.filter(p=>p.working&&!p.healthWorker&&!p.teacher);
- else if(seedContext==='hospital')candidates=candidates.filter(p=>p.healthWorker);
+ if(seedContext==='school')candidates=candidates.filter(p=>p.school);
+ else if(seedContext==='work')candidates=candidates.filter(p=>p.work&&p.working&&!p.healthWorker&&!p.teacher);
+ else if(seedContext==='hospital')candidates=candidates.filter(p=>p.healthWorker||city.places.get(p.work)?.type==='hospital');
  else if(cfg.initialInfectionMode==='child_at_home')candidates=candidates.filter(p=>p.age==='child');
  if(!candidates.length)candidates=seedRegion===null?P:P.filter(p=>p.region===seedRegion);
  if(!candidates.length)candidates=P;
- const seeds=shuffle([...candidates],rand);function infect(target,day,source,layer,place=null,hours=null){if(target.state!=='S')return false;target.state='E';target.infectedDay=day;target.onsetDay=day+cfg.latentDays;target.infectiousStartDay=Math.max(day,target.onsetDay-(cfg.preSymptomaticDays??0));target.outcomeDay=target.onsetDay+cfg.infectiousDays;target.source=source;target.symptomatic=null;target.symptomOnsetProcessed=false;events.push({day,type:'infection',person:target.id,source,layer,place:place??target.home,contactHours:hours});transmissionByLayer[layer]=(transmissionByLayer[layer]||0)+1;return true;}
- for(let n=0;n<Math.min(cfg.initialInfections,seeds.length);n++)infect(seeds[n],0,null,'seed',seedPlaceFor(seeds[n]));let alerted=false,consecutiveAlertWindows=0,totalDoses=0,deniedPeople=new Set();
+ let seeds=shuffle([...candidates],rand);
+ if(Number.isInteger(cfg.initialSeedAgentId)&&P[cfg.initialSeedAgentId]){
+  seeds=[P[cfg.initialSeedAgentId],...seeds.filter(p=>p.id!==cfg.initialSeedAgentId)];
+ }
+ for(let n=0;n<Math.min(cfg.initialInfections,seeds.length);n++){
+  const target=seeds[n],place=placeForContext(target,seedContext);
+  infect(target,0,null,'seed',place,null,'seed',cfg.initialSeedPlaceId??visualOf(place));
+ }
+ let alerted=false,consecutiveAlertWindows=0,totalDoses=0,deniedPeople=new Set();
+
+ function processContactGroups(groups,day,block,scaleByLayer,vaccine){
+  let created=0;
+  for(const [place,people] of groups){
+   if(people.length<2)continue;
+   const placeInfo=city.places.get(place);
+   if(!placeInfo)continue;
+   const layer=placeInfo.type;
+   const matrix=matrixForLayer(cfg,layer);
+   const layerScale=scaleByLayer[layer]??0;
+   if(!matrix||!(layerScale>0))continue;
+   const buckets=AGE_GROUPS.map(ag=>people.filter(x=>x.age===ag));
+   const touched=new Set(),hazard=new Map(),contrib=new Map();
+   for(const a of people){
+    const row=matrix[AGE_INDEX[a.age]].map(x=>x*layerScale);
+    const expected=row.reduce((x,y)=>x+y,0);
+    if(!(expected>0))continue;
+    const n=Math.min(cfg.maxContactSamplesPerPerson??4,people.length-1,Math.max(1,Math.round(expected)));
+    const expansion=expected/n;
+    for(let k=0;k<n;k++){
+     const weights=row.map((x,i)=>buckets[i].length?x:0);
+     const gi=weightedIndex(weights,rand);if(gi<0)continue;
+     const pool=buckets[gi];if(!pool.length)continue;
+     let b=pool[Math.floor(rand()*pool.length)];
+     if(b.id===a.id){if(pool.length<2)continue;b=pool[(pool.indexOf(b)+1)%pool.length];}
+     const key=Math.min(a.id,b.id)+':'+Math.max(a.id,b.id);
+     if(touched.has(key))continue;touched.add(key);
+     const hours=durationSample(cfg,layer,rand);
+     function expose(target,infector){
+      if(target.state!=='S'||infector.state!=='I'||day>=infector.onsetDay+cfg.infectiousDays)return;
+      const vp=target.vaccinatedDay!==null&&day>=target.vaccinatedDay+vaccine.daysToProtection?vaccine.infectionProtectionFraction:0;
+      const h=cfg.beta*hours*expansion*(cfg.relativeSusceptibilityByAge[target.age]??1)*(1-vp);
+      if(!(h>0))return;
+      hazard.set(target.id,(hazard.get(target.id)||0)+h);
+      if(!contrib.has(target.id))contrib.set(target.id,[]);
+      contrib.get(target.id).push({person:infector.id,layer,weight:h,place,hours,block,visualPlace:placeInfo.visualId??place});
+     }
+     expose(a,b);expose(b,a);
+    }
+   }
+   for(const [id,h] of hazard){
+    if(rand()>=1-Math.exp(-h))continue;
+    const opts=contrib.get(id);let r=rand()*h,src=opts.at(-1);
+    for(const o of opts){r-=o.weight;if(r<=0){src=o;break;}}
+    if(infect(P[id],day,src.person,src.layer,src.place,src.hours,block,src.visualPlace))created++;
+   }
+  }
+  return created;
+ }
+
  for(let day=0;day<cfg.days;day++){
-  let newInfections=0,newReports=0,newAdmissions=0,newDeaths=0,dosesToday=0,requestedBeds=0;const vaccine=cfg.vaccination;
-  if(vaccine.enabled&&day>=vaccine.availableDay&&vaccine.dosesPerDay>0){let v=P.filter(p=>p.state==='S'&&p.vaccinatedDay===null&&p.vaccineWilling<vaccine.uptakeProbability);if(vaccine.priority==='older_first')v.sort((a,b)=>AGE_INDEX[b.age]-AGE_INDEX[a.age]||a.id-b.id);else shuffle(v,rand);for(const p of v.slice(0,Math.floor(vaccine.dosesPerDay))){p.vaccinatedDay=day;dosesToday++;events.push({day,type:'vaccination',person:p.id});}totalDoses+=dosesToday;}
-  const cap=applicable(cfg,'hospital_capacity_change',day,0);const beds=Math.max(0,cfg.beds+cap.reduce((s,p)=>s+(p.bedsDelta??0),0));const activeCare=()=>P.reduce((n,p)=>n+(p.state==='H'),0);
+  let newInfections=0,newReports=0,newAdmissions=0,newDeaths=0,dosesToday=0,requestedBeds=0,bridgeCrossings=0;
+  const vaccine=cfg.vaccination;
+  if(vaccine.enabled&&day>=vaccine.availableDay&&vaccine.dosesPerDay>0){
+   let v=P.filter(p=>p.state==='S'&&p.vaccinatedDay===null&&p.vaccineWilling<vaccine.uptakeProbability);
+   if(vaccine.priority==='older_first')v.sort((a,b)=>AGE_INDEX[b.age]-AGE_INDEX[a.age]||a.id-b.id);else shuffle(v,rand);
+   for(const p of v.slice(0,Math.floor(vaccine.dosesPerDay))){p.vaccinatedDay=day;dosesToday++;events.push({day,type:'vaccination',person:p.id});}
+   totalDoses+=dosesToday;
+  }
+  const cap=applicable(cfg,'hospital_capacity_change',day,0);
+  const beds=Math.max(0,cfg.beds+cap.reduce((s,p)=>s+(p.bedsDelta??0),0));
+  const activeCare=()=>P.reduce((n,p)=>n+(p.state==='H'),0);
+
   for(const p of P){
    if(p.state==='E'&&day>=p.infectiousStartDay){p.state='I';events.push({day,type:'infectious_onset',person:p.id});}
-   if(p.state==='I'&&!p.symptomOnsetProcessed&&day>=p.onsetDay){p.symptomOnsetProcessed=true;p.symptomatic=rand()<cfg.symptomaticProbability;events.push({day,type:'symptom_onset',person:p.id,symptomatic:p.symptomatic});if(p.symptomatic&&rand()<cfg.detectionProbabilityIfSymptomatic){const rd=day+cfg.reportDelayDays;reports.set(rd,[...(reports.get(rd)||[]),p.id]);}}
-   if((p.state==='I'||p.state==='H')&&p.infectedDay!==null){if(p.state==='I'&&!p.severityAssessed&&day>=p.onsetDay){p.severityAssessed=true;p.severe=Boolean(p.symptomatic)&&rand()<(cfg.severeProbabilityByAge[p.age]??0);if(p.severe){let delay=pmfSample(clinicalPmf(cfg,'symptom_to_hospital_pmf_days_0_30',p.age),rand);if(delay===null)delay=2;p.hospitalRequestDay=p.onsetDay+delay;}}
-    if(p.state==='I'&&p.severe&&p.hospitalRequestDay!==null&&day>=p.hospitalRequestDay&&day<p.outcomeDay){requestedBeds++;if(activeCare()<beds){p.state='H';p.admittedDay=day;let stay=pmfSample(clinicalPmf(cfg,'hospital_to_outcome_pmf_days_0_30',p.age),rand);if(stay===null||stay<1)stay=7;p.outcomeDay=Math.max(p.outcomeDay,day+stay);newAdmissions++;events.push({day,type:'hospital_admission',person:p.id});}else{p.careDenied=true;deniedPeople.add(p.id);}}
-    if(day>=p.outcomeDay){let died=false;if(p.severe){let risk=cfg.clinicalProfile?.death_fraction_given_hospitalized?.[p.age];if(!Number.isFinite(risk))risk=.05;if(p.admittedDay===null)risk=clamp(risk*(cfg.deniedCareMortalityMultiplier??1));died=rand()<risk;}p.state=died?'D':'R';if(died)newDeaths++;events.push({day,type:died?'death':'recovery',person:p.id});}}
+   if(p.state==='I'&&!p.symptomOnsetProcessed&&day>=p.onsetDay){
+    p.symptomOnsetProcessed=true;p.symptomatic=rand()<cfg.symptomaticProbability;
+    events.push({day,type:'symptom_onset',person:p.id,symptomatic:p.symptomatic});
+    if(p.symptomatic&&rand()<cfg.detectionProbabilityIfSymptomatic){
+     const rd=day+cfg.reportDelayDays;reports.set(rd,[...(reports.get(rd)||[]),p.id]);
+    }
+   }
+   if((p.state==='I'||p.state==='H')&&p.infectedDay!==null){
+    if(p.state==='I'&&!p.severityAssessed&&day>=p.onsetDay){
+     p.severityAssessed=true;p.severe=Boolean(p.symptomatic)&&rand()<(cfg.severeProbabilityByAge[p.age]??0);
+     if(p.severe){
+      let delay=pmfSample(clinicalPmf(cfg,'symptom_to_hospital_pmf_days_0_30',p.age),rand);
+      if(delay===null)delay=2;p.hospitalRequestDay=p.onsetDay+delay;
+     }
+    }
+    if(p.state==='I'&&p.severe&&p.hospitalRequestDay!==null&&day>=p.hospitalRequestDay&&day<p.outcomeDay){
+     requestedBeds++;
+     if(activeCare()<beds){
+      p.state='H';p.admittedDay=day;
+      let stay=pmfSample(clinicalPmf(cfg,'hospital_to_outcome_pmf_days_0_30',p.age),rand);
+      if(stay===null||stay<1)stay=7;p.outcomeDay=Math.max(p.outcomeDay,day+stay);
+      newAdmissions++;events.push({day,type:'hospital_admission',person:p.id,visualPlace:visualOf(p.hospital)});
+     }else{p.careDenied=true;deniedPeople.add(p.id);}
+    }
+    if(day>=p.outcomeDay){
+     let died=false;
+     if(p.severe){
+      let risk=cfg.clinicalProfile?.death_fraction_given_hospitalized?.[p.age];if(!Number.isFinite(risk))risk=.05;
+      if(p.admittedDay===null)risk=clamp(risk*(cfg.deniedCareMortalityMultiplier??1));
+      died=rand()<risk;
+     }
+     p.state=died?'D':'R';if(died)newDeaths++;events.push({day,type:died?'death':'recovery',person:p.id});
+    }
+   }
   }
-  const importCount=poissonSample(cfg.externalImportationRatePerDay??0,rand);if(importCount>0){const susceptible=shuffle(P.filter(p=>p.state==='S'),rand);for(const p of susceptible.slice(0,importCount)){if(infect(p,day,null,'external_importation',p.home,null))newInfections++;}}
-  const groups=new Map();const add=(id,p)=>{if(!id)return;if(!groups.has(id))groups.set(id,[]);groups.get(id).push(p);};function permittedCrossing(p,dst){if(sides(p.region,cfg.regions)===sides(dst,cfg.regions))return true;if(eligible(p,cfg,'bridge_closure',day))return false;return !eligible(p,cfg,'mobility_restriction',day);}
-  for(const p of P)if(p.state!=='D'&&p.state!=='H')add(p.home,p);let crossings=0;const weekday=day%7<5;
-  for(const p of P){if(p.state==='D')continue;if(p.state==='H'){add(city.hospitals[p.region],p);continue;}const lock=eligible(p,cfg,'lockdown',day);const symptomaticIsolation=p.state==='I'&&p.symptomatic===true&&eligible(p,cfg,'case_isolation',day);if(symptomaticIsolation)continue;
-   if(weekday&&p.schoolEnrolled&&!lock&&!eligible(p,cfg,'school_closure',day))add(p.school,p);
-   if(weekday&&p.working){const remote=(eligible(p,cfg,'remote_work',day)||eligible(p,cfg,'workplace_closure',day)||lock)&&!p.healthWorker;if(!remote&&permittedCrossing(p,p.workRegion)){add(p.work,p);if(sides(p.region,cfg.regions)!==sides(p.workRegion,cfg.regions))crossings++;}}
-   const restrict=eligible(p,cfg,'mobility_restriction',day)||lock;if(!restrict&&!eligible(p,cfg,'retail_limit',day))add(city.markets[p.region],p);if(!restrict&&!eligible(p,cfg,'community_closure',day))add(city.parks[p.region],p);
+
+  const importCount=poissonSample(cfg.externalImportationRatePerDay??0,rand);
+  if(importCount>0){
+   const susceptible=shuffle(P.filter(p=>p.state==='S'),rand);
+   for(const p of susceptible.slice(0,importCount)){
+    if(infect(p,day,null,'external_importation',p.home,null,'external',p.visualHome))newInfections++;
+   }
   }
-  const hazard=new Map(),contrib=new Map();for(const [place,people] of groups){if(people.length<2)continue;const layer=city.places.get(place).type,matrix=matrixForLayer(cfg,layer);if(!matrix)continue;const buckets=AGE_GROUPS.map(ag=>people.filter(x=>x.age===ag));const touched=new Set();for(const a of people){const row=matrix[AGE_INDEX[a.age]],expected=row.reduce((x,y)=>x+y,0);if(!(expected>0))continue;let n=Math.min(cfg.maxContactSamplesPerPerson??4,people.length-1,Math.max(1,Math.round(expected)));const expansion=expected/n;for(let k=0;k<n;k++){let weights=row.map((x,i)=>buckets[i].length?x:0);const gi=weightedIndex(weights,rand);if(gi<0)continue;let pool=buckets[gi];if(!pool.length)continue;let b=pool[Math.floor(rand()*pool.length)];if(b.id===a.id){if(pool.length<2)continue;b=pool[(pool.indexOf(b)+1)%pool.length];}const key=Math.min(a.id,b.id)+':'+Math.max(a.id,b.id);if(touched.has(key))continue;touched.add(key);const hours=durationSample(cfg,layer,rand);function expose(target,infector){if(target.state!=='S'||infector.state!=='I'||day>=infector.onsetDay+cfg.infectiousDays)return;const vp=target.vaccinatedDay!==null&&day>=target.vaccinatedDay+vaccine.daysToProtection?vaccine.infectionProtectionFraction:0;const h=cfg.beta*hours*expansion*(cfg.relativeSusceptibilityByAge[target.age]??1)*(1-vp);if(!(h>0))return;hazard.set(target.id,(hazard.get(target.id)||0)+h);if(!contrib.has(target.id))contrib.set(target.id,[]);contrib.get(target.id).push({person:infector.id,layer,weight:h,place,hours});}expose(a,b);expose(b,a);}}
+
+  const addPresence=(groups,id,p)=>{if(!id)return;if(!groups.has(id))groups.set(id,[]);groups.get(id).push(p);};
+  const permittedCrossing=(p,dst)=>{
+   if(sides(p.region,cfg.regions)===sides(dst,cfg.regions))return true;
+   if(eligible(p,cfg,'bridge_closure',day))return false;
+   return !eligible(p,cfg,'mobility_restriction',day);
+  };
+  const morning=new Map(),daytime=new Map(),evening=new Map(),night=new Map();
+  const weekday=day%7<5;
+  const outingProbability=weekday?(cfg.routine?.weekdayOutingProbability??.55):(cfg.routine?.weekendOutingProbability??.72);
+  const retailShare=clamp(cfg.communityAllocation?.retail??.44,0,1);
+
+  for(const p of P){
+   if(p.state==='D')continue;
+   if(p.state==='H'){
+    addPresence(daytime,p.hospital,p);
+    continue;
+   }
+   addPresence(morning,p.home,p);
+   const isolated=p.state==='I'&&p.symptomatic===true&&eligible(p,cfg,'case_isolation',day);
+   const lock=eligible(p,cfg,'lockdown',day);
+   let placedDay=false;
+   if(!isolated&&weekday&&p.schoolEnrolled&&!lock&&!eligible(p,cfg,'school_closure',day)&&p.school){
+    addPresence(daytime,p.school,p);placedDay=true;
+   }else if(!isolated&&weekday&&p.working){
+    const remote=(eligible(p,cfg,'remote_work',day)||eligible(p,cfg,'workplace_closure',day)||lock)&&!p.healthWorker;
+    if(!remote&&p.work&&permittedCrossing(p,p.workRegion)){
+     addPresence(daytime,p.work,p);placedDay=true;
+     if(sides(p.region,cfg.regions)!==sides(p.workRegion,cfg.regions))bridgeCrossings++;
+    }
+   }
+   if(!placedDay)addPresence(daytime,p.home,p);
+
+   const restricted=isolated||lock||eligible(p,cfg,'mobility_restriction',day);
+   if(!restricted&&rand()<outingProbability){
+    const chooseRetail=rand()<retailShare;
+    if(chooseRetail){
+     if(!eligible(p,cfg,'retail_limit',day)&&p.market)addPresence(evening,p.market,p);
+    }else if(!eligible(p,cfg,'community_closure',day)&&p.community)addPresence(evening,p.community,p);
+   }
+   addPresence(night,p.home,p);
   }
-  for(const [id,h] of hazard){if(rand()<1-Math.exp(-h)){let opts=contrib.get(id),r=rand()*h,src=opts.at(-1);for(const o of opts){r-=o.weight;if(r<=0){src=o;break;}}if(infect(P[id],day,src.person,src.layer,src.place,src.hours))newInfections++;}}
+
+  newInfections+=processContactGroups(morning,day,'home_morning',{household:.35},vaccine);
+  newInfections+=processContactGroups(daytime,day,'daytime',{household:.25,school:1,work:1,hospital:1},vaccine);
+  newInfections+=processContactGroups(evening,day,'evening_outing',{retail:1,community:1},vaccine);
+  newInfections+=processContactGroups(night,day,'home_night',{household:.65},vaccine);
+
   for(const id of reports.get(day)||[]){newReports++;P[id].detected=true;events.push({day,type:'reported_case',person:id});}
-  let alertMetric=null,alertThreshold=null,expected=null;if(cfg.alert.mode==='hospital_excess'){const a=alertExpected(cfg,day);expected=a.expected;const start=day-(cfg.alert.windowDays??7)+1;const observed=daily.filter(x=>x.day>=start).reduce((s,x)=>s+x.admissions,0)+newAdmissions;alertMetric=observed;alertThreshold=poissonUpperQuantile(expected,1-(cfg.alert.alpha??.01));if(observed>alertThreshold)consecutiveAlertWindows++;else consecutiveAlertWindows=0;if(!alerted&&consecutiveAlertWindows>=(cfg.alert.consecutiveWindows??1)){alerted=true;alertDays.push(day);events.push({day,type:'game_alert',reason:'hospital_admissions_above_data_informed_srag_baseline',observed,expected,threshold:alertThreshold});}}
-  else{const start=day-(cfg.alert.windowDays??7)+1;const observed=daily.filter(x=>x.day>=start).reduce((s,x)=>s+x.newReportedCases,0)+newReports;alertMetric=observed;alertThreshold=cfg.alert.detectedCasesThreshold??1;if(!alerted&&observed>=alertThreshold){alerted=true;alertDays.push(day);events.push({day,type:'game_alert',reason:'configurable_detected_case_rule'});}}
-  const cnt={S:0,E:0,I:0,H:0,R:0,D:0};for(const p of P)cnt[p.state]++;if(Object.values(cnt).reduce((x,y)=>x+y,0)!==cfg.population)throw Error('population conservation violation');daily.push({day,...cnt,alive:cfg.population-cnt.D,newInfections,newReportedCases:newReports,gameAlert:alerted,alertMetric,alertThreshold,expectedHospitalAdmissions7d:expected,admissions:newAdmissions,deathIncidence:newDeaths,bedCapacity:beds,bedsOccupied:cnt.H,bedRequests:requestedBeds,unmetBedRequests:Math.max(0,requestedBeds-newAdmissions),dosesDelivered:dosesToday,cumulativeDoses:totalDoses,bridgeCrossings:crossings});if(options.onDay)options.onDay(daily.at(-1));
+
+  let alertMetric=null,alertThreshold=null,expected=null;
+  if(cfg.alert.mode==='hospital_excess'){
+   const a=alertExpected(cfg,day);expected=a.expected;
+   const startWindow=day-(cfg.alert.windowDays??7)+1;
+   const observed=daily.filter(x=>x.day>=startWindow).reduce((s,x)=>s+x.admissions,0)+newAdmissions;
+   alertMetric=observed;alertThreshold=poissonUpperQuantile(expected,1-(cfg.alert.alpha??.01));
+   if(observed>alertThreshold)consecutiveAlertWindows++;else consecutiveAlertWindows=0;
+   if(!alerted&&consecutiveAlertWindows>=(cfg.alert.consecutiveWindows??1)){
+    alerted=true;alertDays.push(day);
+    events.push({day,type:'game_alert',reason:'hospital_admissions_above_data_informed_srag_baseline',observed,expected,threshold:alertThreshold});
+   }
+  }else{
+   const startWindow=day-(cfg.alert.windowDays??7)+1;
+   const observed=daily.filter(x=>x.day>=startWindow).reduce((s,x)=>s+x.newReportedCases,0)+newReports;
+   alertMetric=observed;alertThreshold=cfg.alert.detectedCasesThreshold??1;
+   if(!alerted&&observed>=alertThreshold){
+    alerted=true;alertDays.push(day);events.push({day,type:'game_alert',reason:'configurable_detected_case_rule'});
+   }
+  }
+  const cnt={S:0,E:0,I:0,H:0,R:0,D:0};for(const p of P)cnt[p.state]++;
+  if(Object.values(cnt).reduce((x,y)=>x+y,0)!==cfg.population)throw Error('population conservation violation');
+  daily.push({
+   day,...cnt,alive:cfg.population-cnt.D,newInfections,newReportedCases:newReports,gameAlert:alerted,
+   alertMetric,alertThreshold,expectedHospitalAdmissions7d:expected,admissions:newAdmissions,deathIncidence:newDeaths,
+   bedCapacity:beds,bedsOccupied:cnt.H,bedRequests:requestedBeds,unmetBedRequests:Math.max(0,requestedBeds-newAdmissions),
+   dosesDelivered:dosesToday,cumulativeDoses:totalDoses,bridgeCrossings
+  });
+  if(options.onDay)options.onDay(daily.at(-1));
  }
- return {modelVersion:MODEL_VERSION,seed:cfg.seed,parameterSetId:cfg.parameterSetId??null,config:cfg,city:{places:[...city.places.values()],persons:P.length},daily,events,summary:{population:cfg.population,finalAlive:daily.at(-1).alive,finalDeaths:daily.at(-1).D,everInfected:events.filter(e=>e.type==='infection').length,reportedCases:events.filter(e=>e.type==='reported_case').length,hospitalAdmissions:events.filter(e=>e.type==='hospital_admission').length,uniqueDeniedBed:deniedPeople.size,vaccinated:totalDoses,alertDay:alertDays[0]??null,transmissionsByLayer:transmissionByLayer}};
+ return {
+  modelVersion:MODEL_VERSION,seed:cfg.seed,parameterSetId:cfg.parameterSetId??null,config:cfg,
+  city:{places:[...city.places.values()],persons:P.length},
+  daily,events,
+  summary:{
+   population:cfg.population,finalAlive:daily.at(-1).alive,finalDeaths:daily.at(-1).D,
+   everInfected:events.filter(e=>e.type==='infection').length,
+   reportedCases:events.filter(e=>e.type==='reported_case').length,
+   hospitalAdmissions:events.filter(e=>e.type==='hospital_admission').length,
+   uniqueDeniedBed:deniedPeople.size,vaccinated:totalDoses,alertDay:alertDays[0]??null,
+   transmissionsByLayer:transmissionByLayer
+  }
+ };
 }
 export function summarizeRuns(results){if(!results.length)throw Error('no runs');const pick=f=>results.map(f).sort((a,b)=>a-b),q=(a,p)=>a[Math.floor((a.length-1)*p)];const infected=pick(r=>r.summary.everInfected),deaths=pick(r=>r.summary.finalDeaths);return {runs:results.length,infected:{median:q(infected,.5),p05:q(infected,.05),p95:q(infected,.95)},deaths:{median:q(deaths,.5),p05:q(deaths,.05),p95:q(deaths,.95)}};}
