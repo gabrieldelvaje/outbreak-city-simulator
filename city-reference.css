@@ -69,3 +69,63 @@
 html:not([data-theme="dark"]) #places-layer .place-pin-shape {
   filter:drop-shadow(0 2px 3px rgba(20,37,59,.23)) !important;
 }
+
+
+/* Public-place names are no longer permanently printed under buildings. */
+#places-layer .place-label{
+  display:none;
+}
+
+/* Hover/focus interaction: the pin rises slightly and its name appears above it. */
+#places-layer .place-pin-art{
+  transform-box:fill-box;
+  transform-origin:center bottom;
+  transition:transform 180ms cubic-bezier(.2,.75,.25,1);
+}
+#places-layer .place-pin-tooltip{
+  opacity:0;
+  transform-box:fill-box;
+  transform-origin:center bottom;
+  transition:opacity 140ms ease, transform 180ms cubic-bezier(.2,.75,.25,1);
+}
+#places-layer .place-pin-tooltip-bg{
+  fill:#253442;
+  fill-opacity:.94;
+  stroke:#fff;
+  stroke-opacity:.18;
+  stroke-width:.5;
+}
+#places-layer .place-pin-tooltip-text{
+  fill:#fff;
+  paint-order:stroke;
+  stroke:#253442;
+  stroke-width:.35px;
+  pointer-events:none;
+}
+#places-layer .map-place:hover > .place-pin .place-pin-art,
+#places-layer .map-place:focus-visible > .place-pin .place-pin-art{
+  transform:translateY(-4px);
+}
+#places-layer .map-place:hover > .place-pin .place-pin-tooltip,
+#places-layer .map-place:focus-visible > .place-pin .place-pin-tooltip{
+  opacity:1;
+  transform:translateY(-4px);
+}
+
+html[data-theme="dark"] #places-layer .place-pin-tooltip-bg{
+  fill:#111b28;
+  fill-opacity:.96;
+  stroke:#95a5ba;
+  stroke-opacity:.35;
+}
+html[data-theme="dark"] #places-layer .place-pin-tooltip-text{
+  fill:#f4f7fb;
+  stroke:#111b28;
+}
+
+@media (prefers-reduced-motion:reduce){
+  #places-layer .place-pin-art,
+  #places-layer .place-pin-tooltip{
+    transition:none;
+  }
+}
