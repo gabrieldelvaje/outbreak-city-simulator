@@ -21,7 +21,7 @@ Os Parquet SIVEP 2019–2024 permanecem como insumos de validação. O conjunto 
 
 ## 2. População sintética
 
-O motor mantém `10 <= N <= 30.000` agentes.
+O jogo atual mantém `10 <= N <= 20.000` agentes.
 
 A distribuição etária brasileira fornecida foi agregada em:
 
@@ -98,7 +98,7 @@ A competência 202512 do CNES foi usada como referência de estoque cadastrado, 
 | UTI existente | 30,93 |
 | UTI SUS | 15,24 |
 
-Para N=30.000, a referência bruta equivale a ~74 leitos existentes e ~9 leitos de UTI existentes. O cenário continua sobrescrevível, porque leito cadastrado não é sinônimo de leito livre/operacional.
+Para N=20.000, a mesma taxa de referência equivale a ~49 leitos existentes e ~6 leitos de UTI existentes. O cenário continua sobrescrevível, porque leito cadastrado não é sinônimo de leito livre/operacional.
 
 ## 7. SIVEP-Gripe 2025 — progressão clínica
 
@@ -226,7 +226,7 @@ O motor usa uma taxa de tentativas de introdução por 1.000 habitantes/dia:
 
 O número diário de tentativas é amostrado por Poisson e escala com o tamanho da população.
 
-Essas taxas também são **hipóteses do jogo**. WHO, SIVEP, FluNet, FluID e MERS não identificam diretamente quantas introduções infecciosas ocorreriam por dia numa cidade sintética de 10–30 mil habitantes.
+Essas taxas também são **hipóteses do jogo**. WHO, SIVEP, FluNet, FluID e MERS não identificam diretamente quantas introduções infecciosas ocorreriam por dia numa cidade sintética de 10–20 mil habitantes.
 
 ### Vacinação e novas ondas
 
@@ -237,3 +237,16 @@ A expectativa qualitativa do cenário é, portanto:
 `1ª onda → recuperação → queda → perda gradual de imunidade/reintroduções → nova onda potencial → vacinação → redução progressiva da suscetibilidade efetiva`.
 
 Isso é um comportamento do modelo e não uma previsão temporal para epidemias reais.
+
+
+## 15. Adendo v2.4 — campanha anual, ondas, leitos e três doses
+
+A V0.7 fixa a experiência jogável em 360 dias e transmissibilidade alta. O ano é dividido em quatro fases de 90 dias com multiplicadores suaves de transmissão e importação armazenados em `scenario_assumptions.annual_wave_schedule`.
+
+**Status:** `GAME_SCENARIO_SHAPE_NOT_ESTIMATED_FROM_SUPPLIED_DATA`.
+
+Os dados fornecidos não justificam um calendário determinístico de quatro ondas; esse componente atende ao desenho do jogo.
+
+A falta de leito usa `unmet_care_mortality_per_denied_day=0,18` como hipótese explícita. Casos graves que solicitam atendimento sem vaga acumulam dias de espera e têm aumento de risco no modelo. Esse valor não foi estimado do SIVEP/CNES e não deve ser interpretado como efeito clínico real.
+
+A vacinação em três doses usa valores em `scenario_assumptions.vaccine_dose_scenarios`. Eles não representam uma vacina específica. A terceira dose funciona como cenário de reforço/atualização para cepas posteriores.
