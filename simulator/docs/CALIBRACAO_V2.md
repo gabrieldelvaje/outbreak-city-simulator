@@ -2,7 +2,7 @@
 
 **Data da análise:** 25/09/2026  
 **Versão do conjunto de parâmetros:** `2.1.0`  
-**Versão do motor:** `2.1.0-spatial-routines`
+**Versão do motor:** `2.5.0-severity-report`
 
 > Esta entrega substitui parte das hipóteses do motor v1 por distribuições e taxas derivadas diretamente das bases fornecidas ao projeto. A calibração é **parcial**: transmissão absoluta por hora, período latente/infeccioso, eficácia causal de políticas e eficácia vacinal não são identificáveis nos arquivos disponíveis e continuam como parâmetros de sensibilidade explicitamente marcados.
 
@@ -250,3 +250,19 @@ Os dados fornecidos não justificam um calendário determinístico de quatro ond
 A falta de leito usa `unmet_care_mortality_per_denied_day=0,18` como hipótese explícita. Casos graves que solicitam atendimento sem vaga acumulam dias de espera e têm aumento de risco no modelo. Esse valor não foi estimado do SIVEP/CNES e não deve ser interpretado como efeito clínico real.
 
 A vacinação em três doses usa valores em `scenario_assumptions.vaccine_dose_scenarios`. Eles não representam uma vacina específica. A terceira dose funciona como cenário de reforço/atualização para cepas posteriores.
+
+
+## 16. Adendo V0.8 — gravidade jogável e relatório final
+
+A V0.8 introduz dois parâmetros de balanceamento:
+
+- `playable_severity_multiplier = 4,0`;
+- `unmet_care_daily_death_hazard = 0,055`.
+
+Ambos têm status de **hipótese de jogo, não estimativa clínica**.
+
+O primeiro aumenta a frequência de casos que chegam à etapa de demanda hospitalar no cenário jogável de alta transmissibilidade. O segundo adiciona risco diário enquanto um caso grave permanece sem leito.
+
+Os testes incluem uma campanha anual de alta transmissão sem ação, sem vacinação e sem expansão de leitos; ela deve produzir demanda hospitalar relevante, esgotamento de leitos e óbitos associados no modelo à falta de atendimento.
+
+A interface também executa um contrafactual interno no Dia 360 com a mesma seed e condições iniciais, removendo medidas, vacinação e expansão de capacidade. A diferença é usada apenas para o relatório do jogo.
