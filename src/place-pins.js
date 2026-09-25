@@ -4,6 +4,7 @@ import {places,placeColors} from './city-data.js';
 
 const NS='http://www.w3.org/2000/svg';
 const typeById=new Map(places.map(place=>[place.id,place.type]));
+const placeById=new Map(places.map(place=>[place.id,place]));
 const darkDiscColors={school:'#9bc8f0',market:'#f0bc88',hospital:'#eea0aa',civic:'#b3c7dd',office:'#bcafe3',park:'#acd9b7'};
 const svg=(tag,attributes,parent)=>{
   const node=document.createElementNS(NS,tag);
@@ -73,6 +74,31 @@ function renderPins(){
     svg('circle',{cx:0,cy:-24,r:10.5,fill:color,class:'place-pin-disc','pointer-events':'none'},art);
     const icon=svg('g',{class:'place-pin-icon',color:'#fff','pointer-events':'none'},art);
     drawIcon(icon,type);
+
+    // Tooltip replaces the permanent text label. It appears only on hover/focus,
+    // while the pin itself lifts slightly from the map.
+    const placeData=placeById.get(place.dataset.place);
+    const tooltipName=placeData?.name || place.querySelector('title')?.textContent || 'Local';
+    const tooltipWidth=Math.max(38,Math.min(118,tooltipName.length*3.35+14));
+    const tooltip=svg('g',{
+      class:'place-pin-tooltip',
+      transform:'translate(0 -48)',
+      'pointer-events':'none',
+      'aria-hidden':'true'
+    },pin);
+    svg('rect',{
+      x:-tooltipWidth/2,y:-8,width:tooltipWidth,height:15,rx:5,
+      class:'place-pin-tooltip-bg'
+    },tooltip);
+    const tooltipText=svg('text',{
+      x:0,y:2.1,
+      class:'place-pin-tooltip-text',
+      'text-anchor':'middle',
+      'font-size':6.2,
+      'font-weight':650
+    },tooltip);
+    tooltipText.textContent=tooltipName;
+
     const label=place.querySelector(':scope > .place-label');
     if(label)place.insertBefore(pin,label);
     dot?.remove();
