@@ -52,7 +52,7 @@ const householdSizes=new Map();
 for(const p of spatialCity.agents)householdSizes.set(p.householdId,(householdSizes.get(p.householdId)||0)+1);
 const householdSeed=spatialCity.agents.find(p=>(householdSizes.get(p.householdId)||0)>1);
 assert.ok(householdSeed,'test city must contain a multi-person household');
-const householdOnly=simulate({...spatialCfg,days:20,seed:8181,beta:5,initialSeedAgentId:householdSeed.id,initialSeedRegion:householdSeed.region,initialSeedContext:'home',initialSeedPlaceId:householdSeed.visualHome,interventions:[
+const householdOnly=simulate({...spatialCfg,days:20,beta:5,initialSeedAgentId:householdSeed.id,initialSeedRegion:householdSeed.region,initialSeedContext:'home',initialSeedPlaceId:householdSeed.visualHome,interventions:[
   {type:'school_closure',startDay:0,endDay:19,fraction:1},
   {type:'workplace_closure',startDay:0,endDay:19,fraction:1},
   {type:'retail_limit',startDay:0,endDay:19,fraction:1},
