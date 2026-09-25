@@ -2,60 +2,53 @@
 
 Simulador experimental de transmissão em uma cidade **inteiramente fictícia**, com mapa vetorial 2D e motor epidemiológico baseado em agentes sintéticos.
 
-## Primeira versão jogável — V0.2
+## Versão jogável atual — V0.3
 
-O mapa e o motor v2 agora estão conectados em uma primeira experiência de jogo no GitHub Pages.
+A V0.3 transforma a população em uma rede persistente antes do início do surto.
 
-O usuário pode:
+O fluxo atual é: escolher entre **10 e 30.000 agentes** → distribuir a população → abrir uma residência → inspecionar os domicílios e o grafo familiar → escolher uma pessoa específica como paciente zero → iniciar a epidemia → acompanhar a disseminação → tomar decisões após o alerta hospitalar.
 
-- escolher entre **10 e 30.000 agentes**;
-- escolher Influenza, COVID-19 ou VSR;
-- escolher transmissibilidade baixa, média ou alta;
-- clicar numa residência ou local público para definir o **foco inicial**;
-- iniciar, pausar, avançar dia a dia e alterar a velocidade;
-- acompanhar atividade recente da infecção nos nós do mapa;
-- observar expostos/infecciosos/internados, novos casos, leitos e óbitos;
-- receber um **alerta de epidemia simulada** quando admissões hospitalares excedem a referência do motor;
-- após o alerta, aplicar fechamento de escolas, home office, fechamento de lazer, restrição de comércio, lockdown ou um cenário de vacinação;
-- recalcular o restante da trajetória mantendo a mesma configuração e semente.
-
-A simulação roda em um **Web Worker**, evitando bloquear a interface enquanto o motor calcula populações maiores.
+A simulação roda em **Web Worker**, sem renderizar todos os agentes simultaneamente.
 
 Página: https://gabrieldelvaje.github.io/outbreak-city-simulator/
 
-## Como a integração funciona
+## População e residências
 
-O mapa possui sete distritos visuais. Na V0.2 eles são associados às regiões sintéticas do motor. O local escolhido pelo usuário define a região e o tipo de ambiente do primeiro caso:
+Cada agente recebe idade/faixa etária, `householdId`, nó residencial `visualHome`, escola, trabalho, mercado habitual, destino comunitário e hospital de referência. Professor e profissional de saúde também são atributos persistentes quando sorteados.
 
-- residência → domicílio;
-- escola → camada escolar;
-- empresa/prefeitura → trabalho;
-- mercado/loja/restaurante → varejo;
-- parque/praça → comunidade;
-- hospital → profissional de saúde compatível quando disponível.
+Quando a população é maior que o número de marcadores residenciais do SVG, um mesmo marcador pode representar **vários domicílios**. Eles continuam epidemiologicamente separados: somente agentes com o mesmo `householdId` compartilham a camada familiar.
 
-Os marcadores residenciais são **agregações visuais**. Portanto, escolher uma casa ancora o paciente zero naquele nó para a interface e no mesmo distrito para o motor, mas ainda não cria uma relação 1:1 permanente entre cada marcador e um único domicílio interno.
+Ao clicar numa casa, a interface mostra total de residentes, número de domicílios, composição etária, seletor de domicílio, grafo de convivência e lista das pessoas. O jogador escolhe uma pessoa concreta como paciente zero.
 
-Os eventos gerados pelo motor são projetados de volta nos nós compatíveis do mesmo distrito. A intensidade visual considera infecções recentes, permitindo acompanhar a expansão espacial aproximada sem renderizar 30 mil pessoas simultaneamente.
+## Rotina diária
+
+O motor 2.1 processa os contatos em quatro blocos temporais:
+
+- `home_morning`: convivência domiciliar pela manhã;
+- `daytime`: escola, trabalho, hospital ou permanência em casa;
+- `evening_outing`: mercado/comércio/restaurante ou parque/praça;
+- `home_night`: retorno ao domicílio.
+
+Fechar escolas ou aplicar home office não remove os agentes da rede: eles permanecem em casa durante o bloco correspondente. Fechar comércio/lazer remove aquela saída. Contatos familiares continuam possíveis.
+
+A frequência e a mistura etária vêm das matrizes brasileiras; a duração dos contatos vem do POLYMOD. A probabilidade diária de realizar uma saída comunitária está explicitamente marcada no JSON como **hipótese de rotina do jogo**, não como estimativa empírica.
 
 ## Motor epidemiológico
 
 - Motor: [`simulator/engine.mjs`](simulator/engine.mjs)
 - Parâmetros: [`simulator/data/calibrated_parameters_v2.json`](simulator/data/calibrated_parameters_v2.json)
 - Análise/calibração: [`simulator/docs/CALIBRACAO_V2.md`](simulator/docs/CALIBRACAO_V2.md)
-- Metodologia matemática: [`simulator/docs/MODELO_E_METODOLOGIA.md`](simulator/docs/MODELO_E_METODOLOGIA.md)
+- Metodologia: [`simulator/docs/MODELO_E_METODOLOGIA.md`](simulator/docs/MODELO_E_METODOLOGIA.md)
+- Jogo V0.3: [`docs/JOGO_V0_3.md`](docs/JOGO_V0_3.md)
 - Testes: [`simulator/tests/test_engine.mjs`](simulator/tests/test_engine.mjs)
-- Primeira versão do jogo: [`docs/JOGO_V0_2.md`](docs/JOGO_V0_2.md)
 
-A frequência e mistura etária dos contatos usam matrizes brasileiras; duração de contatos usa distribuições do POLYMOD; comportamento incorpora indicadores da PNAD COVID; progressão hospitalar usa SIVEP-Gripe 2025; capacidade hospitalar usa referência CNES.
+**Versão do motor:** `2.1.0-spatial-routines`.
 
-## Limitações atuais da V0.2
+## Limitações atuais
 
-As pontes Norte, Central e Sul **ainda não alteram as rotas do motor**. Os controles continuam visuais. A próxima etapa espacial é transformar cada ponte em uma aresta individual do grafo viário.
+As pontes Norte, Central e Sul ainda não são arestas individuais da rotina espacial. Os controles permanecem visuais; a próxima integração é fazer cada deslocamento atravessar uma rota real do grafo.
 
-Também permanecem como cenários de sensibilidade os parâmetros não identificados diretamente pelas bases fornecidas, incluindo beta absoluto por hora, período latente/infeccioso e eficácia de uma vacina hipotética.
-
-As decisões do jogador modificam a rede simulada. Seus percentuais de efeito são resultados daquele cenário sintético, e não estimativas causais de políticas reais.
+Também permanecem como hipóteses/sensibilidade os parâmetros não identificados pelas bases: beta absoluto por hora, períodos latente/infeccioso, eficácia de vacina hipotética e efeito causal isolado de políticas.
 
 ## Executar os testes
 
@@ -66,4 +59,4 @@ node simulator/examples/run_example.mjs
 
 ## Limite científico
 
-OUTBREAK é um projeto educacional e exploratório. Resultados são sintéticos e não constituem previsão médica, declaração epidemiológica oficial nem recomendação de política pública.
+OUTBREAK é educacional e exploratório. Resultados são sintéticos e não constituem previsão médica, declaração epidemiológica oficial nem recomendação de política pública.
