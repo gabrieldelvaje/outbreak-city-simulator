@@ -470,7 +470,8 @@ worker.onmessage=event=>{
     const homes=state.populationIndexes.byVisualHome.size;
     const households=state.populationIndexes.byHousehold.size;
     $('game-status').textContent='População distribuída';
-    announce(`${nfmt(state.population.persons.length)} agentes distribuídos em ${nfmt(households)} domicílios e ${nfmt(homes)} nós residenciais. Clique em uma casa.`,'ok');
+    const crossDistrict=state.population.persons.filter(p=>(p.work&&p.workRegion!==p.region)||(p.school&&p.schoolRegion!==p.region)||(p.market&&p.marketRegion!==p.region)||(p.community&&p.communityRegion!==p.region)).length;
+    announce(`${nfmt(state.population.persons.length)} agentes distribuídos em ${nfmt(households)} domicílios. ${nfmt(crossDistrict)} têm ao menos um destino habitual em outro bairro. Clique em uma casa.`,'ok');
     return;
   }
   if(data.type!=='result')return;
@@ -530,6 +531,8 @@ function renderDay(day){
   $('game-beds').textContent=`${nfmt(d.bedsOccupied)} / ${nfmt(d.bedCapacity)}`;
   $('game-attack').textContent=pct(d.R+d.D+d.E+d.I+d.H,Number(populationNumber.value))+'%';
   $('game-new').textContent=nfmt(d.newInfections);
+  const reached=new Set(state.result.events.filter(e=>e.type==='infection'&&e.day<=state.currentDay&&Number.isInteger(e.targetRegion)).map(e=>e.targetRegion)).size;
+  $('game-regions').textContent=`${reached} / ${districts.length}`;
   $('game-progress').style.width=(state.currentDay/(state.result.daily.length-1)*100)+'%';
   $('game-progress').parentElement.setAttribute('aria-valuenow',String(state.currentDay));
   renderHeat(state.currentDay);
@@ -575,7 +578,7 @@ function resetGame(){
   focusText.textContent='Distribua a população primeiro';
   alertBox.classList.remove('active');alertText.textContent='O hospital ainda não detectou excesso de casos.';
   $('game-day').textContent='Dia —';
-  for(const id of ['game-active','game-hospitalized','game-deaths','game-new'])$(id).textContent='—';
+  for(const id of ['game-active','game-hospitalized','game-deaths','game-new','game-regions'])$(id).textContent='—';
   $('game-beds').textContent='—';$('game-attack').textContent='—';$('game-progress').style.width='0%';
   decisionLog.replaceChildren();inspector.hidden=true;resetAppliedButtons();unlockDecisions(false);
   $('game-status').textContent='Configuração da cidade';
