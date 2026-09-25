@@ -9,7 +9,7 @@ function overridesFrom(setup){
   const overrides={
     population:setup.population,
     regions:setup.regions,
-    days:setup.days??180,
+    days:setup.days??360,
     seed:setup.seed,
     pathogenId:setup.pathogenId,
     spatialModel:setup.spatialModel,
@@ -43,11 +43,29 @@ function compactPopulation(city){
 
 self.onmessage=async event=>{
   const message=event.data||{};
-  if(message.type!=='prepare'&&message.type!=='run')return;
+  if(message.type!=='prepare'&&message.type!=='run'&&message.type!=='compare')return;
   const {token,setup}=message;
   try{
     const params=await paramsPromise;
     const config=configFromProfile(params,setup.transmissibility,overridesFrom(setup));
+    if(message.type==='compare'){
+      const noActionSetup={...setup,interventions:[],vaccination:null,vaccinationCampaigns:[]};
+      const noActionConfig=configFromProfile(params,setup.transmissibility,overridesFrom(noActionSetup));
+      const noAction=simulate(noActionConfig);
+      const peakHospital=Math.max(...noAction.daily.map(d=>d.H));
+      const overloadDays=noAction.daily.filter(d=>(d.unmetBedRequests??0)>0||(d.bedCapacity>0&&d.bedsOccupied>=d.bedCapacity)).length;
+      self.postMessage({
+        type:'comparison',
+        token,
+        comparison:{
+          summary:noAction.summary,
+          final:noAction.daily.at(-1),
+          peakHospital,
+          overloadDays
+        }
+      });
+      return;
+    }
     if(message.type==='prepare'){
       const city=makeCity(config);
       self.postMessage({
