@@ -1,4 +1,4 @@
-import {configFromProfile,makeCity,simulate} from '../simulator/engine.mjs';
+import {MODEL_VERSION,configFromProfile,makeCity,simulate} from '../simulator/engine.mjs';
 
 const paramsPromise=fetch('../simulator/data/calibrated_parameters_v2.json').then(r=>{
   if(!r.ok)throw new Error('Não foi possível carregar os parâmetros epidemiológicos.');
@@ -52,7 +52,7 @@ self.onmessage=async event=>{
         type:'prepared',
         token,
         population:compactPopulation(city),
-        modelVersion:'2.0.0-data-informed'
+        modelVersion:MODEL_VERSION
       });
       return;
     }
