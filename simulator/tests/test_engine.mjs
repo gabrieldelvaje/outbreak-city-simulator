@@ -47,6 +47,18 @@ for(const e of exactSeed.events.filter(e=>e.type==='infection'&&e.layer!=='seed'
   assert.ok(['home_morning','daytime','evening_outing','home_night'].includes(e.block),'secondary transmission must occur inside an explicit daily routine block');
   assert.ok(e.visualPlace,'secondary transmission must resolve to a visual map location');
 }
+
+const householdOnly=simulate({...spatialCfg,days:20,seed:8181,beta:5,initialSeedAgentId:spatialCity.agents[0].id,initialSeedRegion:spatialCity.agents[0].region,initialSeedContext:'home',initialSeedPlaceId:spatialCity.agents[0].visualHome,interventions:[
+  {type:'school_closure',startDay:0,endDay:19,fraction:1},
+  {type:'workplace_closure',startDay:0,endDay:19,fraction:1},
+  {type:'retail_limit',startDay:0,endDay:19,fraction:1},
+  {type:'community_closure',startDay:0,endDay:19,fraction:1}
+]});
+assert.ok((householdOnly.summary.transmissionsByLayer.household??0)>0,'home matrix must drive family transmission when outside activities are closed');
+assert.equal(householdOnly.summary.transmissionsByLayer.school??0,0);
+assert.equal(householdOnly.summary.transmissionsByLayer.work??0,0);
+assert.equal(householdOnly.summary.transmissionsByLayer.retail??0,0);
+assert.equal(householdOnly.summary.transmissionsByLayer.community??0,0);
 const r1=simulate(base),r2=simulate(base);
 assert.deepEqual(r1.daily,r2.daily,'same seed must be reproducible');
 for(const d of r1.daily) assert.equal(d.S+d.E+d.I+d.H+d.R+d.D,600,'population must be conserved');
