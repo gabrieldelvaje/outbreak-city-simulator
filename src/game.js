@@ -596,6 +596,7 @@ function renderFinalReport(comparison){
     finalReportSummary.textContent='Na comparação contrafactual desta seed, as decisões adotadas não reduziram os principais desfechos finais em relação ao cenário sem ação. Veja os indicadores abaixo.';
   }
   finalReportComparison.replaceChildren(
+    comparisonRow('Pessoas infectadas ao menos uma vez',actual.uniqueInfected,baseline.uniqueInfected),
     comparisonRow('Episódios de infecção',actual.episodes,baseline.episodes),
     comparisonRow('Reinfecções',actual.reinfections,baseline.reinfections),
     comparisonRow('Internações',actual.admissions,baseline.admissions),
@@ -654,7 +655,12 @@ function renderHeat(day){
   }
   for(const [id,count] of rolling){
     const node=nodeFromVisualId(id);if(!node)continue;
-    node.dataset.gameLevel=String(count>=8?3:count>=3?2:1);
+    const linked=node.dataset.home
+      ?(state.populationIndexes?.byVisualHome.get(id)?.length??1)
+      :(state.populationIndexes?.byPlace.get(id)?.length??1);
+    const intensity=count/Math.max(1,linked);
+    const level=(intensity>=.12||count>=10)?3:(intensity>=.04||count>=4)?2:1;
+    node.dataset.gameLevel=String(level);
   }
   const seedNode=nodeFromVisualId(state.selected?.seedPlaceId||state.selected?.visualHome);
   seedNode?.classList.add('game-seed-target');
