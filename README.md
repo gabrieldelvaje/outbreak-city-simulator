@@ -2,36 +2,50 @@
 
 Simulador experimental de transmissão em uma cidade **inteiramente fictícia**, com mapa vetorial 2D e motor epidemiológico baseado em agentes sintéticos.
 
-## Versão jogável atual — V0.4
+## Versão jogável atual — V0.5
 
-A V0.4 mantém a população persistente da V0.3 e conecta os bairros por destinos habituais de trabalho, escola, comércio, lazer e hospital.
+A V0.5 mantém a população persistente, a mobilidade entre bairros e acrescenta **perda de imunidade natural, reinfecções e reintroduções externas**, permitindo que a epidemia produza novas ondas mesmo quando a primeira curva cai.
 
-O fluxo atual é: escolher entre **10 e 30.000 agentes** → distribuir a população → abrir uma residência → inspecionar os domicílios e o grafo familiar → escolher uma pessoa específica como paciente zero → iniciar a epidemia → acompanhar a disseminação → tomar decisões após o alerta hospitalar.
-
-A simulação roda em **Web Worker**, sem renderizar todos os agentes simultaneamente.
+O fluxo atual é: escolher entre **10 e 30.000 agentes** → distribuir a população → abrir uma residência → inspecionar domicílios e grafo familiar → escolher uma pessoa específica como paciente zero → iniciar a epidemia → acompanhar disseminação e novas ondas → tomar decisões após o alerta hospitalar.
 
 Página: https://gabrieldelvaje.github.io/outbreak-city-simulator/
 
-## População e residências
+## População, rotina e cidade conectada
 
-Cada agente recebe idade/faixa etária, `householdId`, nó residencial `visualHome`, escola, trabalho, mercado habitual, destino comunitário e hospital de referência. Professor e profissional de saúde também são atributos persistentes quando sorteados.
+Cada agente recebe idade/faixa etária, `householdId`, nó residencial `visualHome`, escola, trabalho, mercado habitual, destino comunitário e hospital de referência.
 
-Quando a população é maior que o número de marcadores residenciais do SVG, um mesmo marcador pode representar **vários domicílios**. Eles continuam epidemiologicamente separados: somente agentes com o mesmo `householdId` compartilham a camada familiar.
+Trabalho, escola, comércio, lazer e hospital podem estar fora do bairro de residência. Pessoas de bairros distintos se encontram nesses locais e retornam aos próprios domicílios, conectando a cidade epidemiologicamente.
 
-Ao clicar numa casa, a interface mostra total de residentes, número de domicílios, composição etária, seletor de domicílio, grafo de convivência e lista das pessoas. O jogador escolhe uma pessoa concreta como paciente zero.
+O dia é processado em quatro blocos:
 
-## Rotina diária
+- `home_morning`;
+- `daytime`;
+- `evening_outing`;
+- `home_night`.
 
-O motor 2.1 processa os contatos em quatro blocos temporais:
+## Reinfecção e ondas
 
-- `home_morning`: convivência domiciliar pela manhã;
-- `daytime`: escola, trabalho, hospital ou permanência em casa;
-- `evening_outing`: mercado/comércio/restaurante ou parque/praça;
-- `home_night`: retorno ao domicílio.
+O estado `R` não é mais necessariamente terminal. Após a recuperação, cada agente recebe uma janela temporária de imunidade natural. Quando essa janela termina:
 
-Fechar escolas ou aplicar home office não remove os agentes da rede: eles permanecem em casa durante o bloco correspondente. Fechar comércio/lazer remove aquela saída. Contatos familiares continuam possíveis.
+`R → S`
 
-A frequência e a mistura etária vêm das matrizes brasileiras; a duração dos contatos vem do POLYMOD. A probabilidade diária de realizar uma saída comunitária e as frações de destinos fora do bairro de residência estão explicitamente marcadas no JSON como **hipóteses da rede do jogo**, não como estimativas empíricas de mobilidade origem–destino.
+A pessoa volta a ser suscetível e pode adquirir uma nova infecção.
+
+Cada episódio guarda `episode` e `reinfection`, e o painel mostra **reinfecções acumuladas** separadamente do percentual de pessoas que já foram infectadas pelo menos uma vez.
+
+O motor também possui reintroduções externas proporcionais ao tamanho da população. Elas representam pressão infecciosa proveniente de fora da cidade fictícia e ajudam a iniciar novas cadeias depois de períodos de baixa circulação.
+
+A vacinação pode atingir suscetíveis **e recuperados**. Depois do atraso para proteção, ela reduz a probabilidade de infecção em contatos locais e também a chance de uma tentativa de reintrodução externa resultar em infecção bem-sucedida.
+
+## Importante sobre os parâmetros de ondas
+
+As bases fornecidas ao projeto **não identificam de forma defensável** a duração da imunidade esterilizante após infecção nem a frequência de introduções infecciosas vindas de fora da cidade.
+
+Por isso, as janelas de imunidade e taxas de reintrodução estão em `scenario_assumptions.reinfection_wave_scenarios` e são marcadas como:
+
+`GAME_ASSUMPTION_NOT_IDENTIFIED_BY_SUPPLIED_DATA`.
+
+Elas são mecânicas de cenário do jogo, não estimativas clínicas.
 
 ## Motor epidemiológico
 
@@ -39,16 +53,16 @@ A frequência e a mistura etária vêm das matrizes brasileiras; a duração dos
 - Parâmetros: [`simulator/data/calibrated_parameters_v2.json`](simulator/data/calibrated_parameters_v2.json)
 - Análise/calibração: [`simulator/docs/CALIBRACAO_V2.md`](simulator/docs/CALIBRACAO_V2.md)
 - Metodologia: [`simulator/docs/MODELO_E_METODOLOGIA.md`](simulator/docs/MODELO_E_METODOLOGIA.md)
-- Jogo V0.4: [`docs/JOGO_V0_4.md`](docs/JOGO_V0_4.md)
+- Jogo V0.5: [`docs/JOGO_V0_5.md`](docs/JOGO_V0_5.md)
 - Testes: [`simulator/tests/test_engine.mjs`](simulator/tests/test_engine.mjs)
 
-**Versão do motor:** `2.2.0-city-mixing`.
+**Versão do motor:** `2.3.0-reinfection-waves`.
 
 ## Limitações atuais
 
-As pontes Norte, Central e Sul ainda não são arestas individuais da rotina espacial. Os controles permanecem visuais; a próxima integração é fazer cada deslocamento atravessar uma rota real do grafo.
+As pontes Norte, Central e Sul ainda não são arestas individuais das rotas. A mobilidade entre bairros já existe no motor, mas ainda não percorre fisicamente uma ponte específica.
 
-Também permanecem como hipóteses/sensibilidade os parâmetros não identificados pelas bases: beta absoluto por hora, períodos latente/infeccioso, eficácia de vacina hipotética e efeito causal isolado de políticas.
+Também permanecem como hipóteses/sensibilidade beta absoluto por hora, períodos latente/infeccioso, eficácia da vacina hipotética, duração da imunidade natural, taxa de reintrodução externa e efeito causal isolado de políticas.
 
 ## Executar os testes
 
