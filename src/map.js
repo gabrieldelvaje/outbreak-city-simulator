@@ -147,7 +147,8 @@ viewport.addEventListener('pointercancel',endPointer);
 svg.addEventListener('click',e=>{
  if(mobileLayout.matches&&Date.now()<suppressMapClickUntil){e.preventDefault();e.stopImmediatePropagation();}
 },true);
-$('toggle-places').onchange=e=>$('places-layer').classList.toggle('map-layer-hidden',!e.target.checked);
+// Public-place visibility controls only the floating pins. Building footprints/tints stay on the map.
+$('toggle-places').onchange=e=>$('places-layer').classList.toggle('place-pins-hidden',!e.target.checked);
 $('toggle-homes').onchange=e=>$('homes-layer').classList.toggle('map-layer-hidden',!e.target.checked);
 $('toggle-flows').onchange=e=>$('flows-layer').classList.toggle('map-layer-hidden',!e.target.checked);
 const inspector=$('inspector');$('inspector-close').onclick=()=>inspector.hidden=true;
