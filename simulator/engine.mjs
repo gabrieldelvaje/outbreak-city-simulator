@@ -358,17 +358,21 @@ export function simulate(config,options={}){
    addPresence(morning,p.home,p);
    const isolated=p.state==='I'&&p.symptomatic===true&&eligible(p,cfg,'case_isolation',day);
    const lock=eligible(p,cfg,'lockdown',day);
-   let placedDay=false;
-   if(!isolated&&weekday&&p.schoolEnrolled&&!lock&&!eligible(p,cfg,'school_closure',day)&&p.school){
-    addPresence(daytime,p.school,p);placedDay=true;
-   }else if(!isolated&&weekday&&p.working){
+   let scheduledAway=false,placedDay=false;
+   if(weekday&&p.schoolEnrolled&&p.school){
+    scheduledAway=true;
+    if(!isolated&&!lock&&!eligible(p,cfg,'school_closure',day)){
+     addPresence(daytime,p.school,p);placedDay=true;
+    }
+   }else if(weekday&&p.working&&p.work){
+    scheduledAway=true;
     const remote=(eligible(p,cfg,'remote_work',day)||eligible(p,cfg,'workplace_closure',day)||lock)&&!p.healthWorker;
-    if(!remote&&p.work&&permittedCrossing(p,p.workRegion)){
+    if(!isolated&&!remote&&permittedCrossing(p,p.workRegion)){
      addPresence(daytime,p.work,p);placedDay=true;
      if(sides(p.region,cfg.regions)!==sides(p.workRegion,cfg.regions))bridgeCrossings++;
     }
    }
-   if(!placedDay)addPresence(daytime,p.home,p);
+   if(scheduledAway&&!placedDay)addPresence(daytime,p.home,p);
 
    const restricted=isolated||lock||eligible(p,cfg,'mobility_restriction',day);
    if(!restricted&&rand()<outingProbability){
