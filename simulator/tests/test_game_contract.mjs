@@ -19,7 +19,7 @@ for(const id of [
 for(const token of [
   "type:'prepare'","type:'run'","initialSeedAgentId","spatialModel",
   "householdId","visualHome","evening_outing"
-]) assert.ok(game.includes(token)||worker.includes(token),'game/worker contract must contain '+token);
+]) assert.ok(game.includes(token)||worker.includes(token)||engine.includes(token),'game/worker/engine contract must contain '+token);
 
 assert.ok(worker.includes("makeCity"),'worker must prepare the population before running the outbreak');
 assert.ok(game.includes("Distribua a população"),'game must require population generation before patient-zero selection');
