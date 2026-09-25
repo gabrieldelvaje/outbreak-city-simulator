@@ -3,10 +3,16 @@ on:
   push:
     paths:
       - 'simulator/**'
+      - 'src/**'
+      - 'index.html'
+      - 'game.css'
       - '.github/workflows/simulator-tests.yml'
   pull_request:
     paths:
       - 'simulator/**'
+      - 'src/**'
+      - 'index.html'
+      - 'game.css'
       - '.github/workflows/simulator-tests.yml'
   workflow_dispatch:
 jobs:
@@ -19,7 +25,11 @@ jobs:
         with:
           node-version: '22'
       - name: Check module syntax
-        run: node --check simulator/engine.mjs
+        run: |
+          node --check simulator/engine.mjs
+          node --check src/game.js
+          node --check src/simulation-worker.js
+          node --check src/map.js
       - name: Test epidemiological engine invariants
         run: node simulator/tests/test_engine.mjs
       - name: Run reproducible demonstration
