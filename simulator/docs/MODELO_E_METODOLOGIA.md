@@ -1,9 +1,9 @@
 # OUTBREAK — modelo matemático e metodologia
 
-**Versão do motor:** `2.3.0-reinfection-waves`  
+**Versão do motor:** `2.4.0-year-waves`  
 **Conjunto principal:** `../data/calibrated_parameters_v2.json`
 
-A análise das bases e limitações está em [CALIBRACAO_V2.md](CALIBRACAO_V2.md). A mecânica atual da interface está em [../../docs/JOGO_V0_5.md](../../docs/JOGO_V0_5.md).
+A análise das bases e limitações está em [CALIBRACAO_V2.md](CALIBRACAO_V2.md). A mecânica atual da interface está em [../../docs/JOGO_V0_7.md](../../docs/JOGO_V0_7.md).
 
 ## 1. Estados
 
@@ -27,7 +27,7 @@ Depois que a imunidade natural configurada termina, um recuperado volta para `S`
 
 ## 2. População e topologia persistentes
 
-A população aceita de 10 a 30.000 agentes. Para a mesma configuração e seed, `makeCity(cfg)` produz a mesma população sintética.
+A população jogável aceita de 10 a 20.000 agentes. Para a mesma configuração e seed, `makeCity(cfg)` produz a mesma população sintética.
 
 Cada agente recebe idade, domicílio interno, marcador residencial, escola, trabalho, mercado, destino comunitário, hospital e atributos ocupacionais.
 
@@ -165,7 +165,7 @@ Os testes cobrem:
 - perda de imunidade;
 - reinfecção;
 - redução de reinfecções por vacinação protetora em cenário controlado;
-- população máxima de 30.000 agentes.
+- população máxima de 20.000 agentes.
 
 ## 12. Limitações
 
@@ -177,3 +177,26 @@ Os testes cobrem:
 - SIVEP 2019–2024 ainda não foi harmonizado ao conjunto clínico publicado.
 
 Consulte [CALIBRACAO_V2.md](CALIBRACAO_V2.md) antes de interpretar qualquer parâmetro.
+
+
+## 13. Campanha anual V0.7
+
+A experiência jogável usa 360 dias e quatro fases de aproximadamente 90 dias. `waveDynamics.waveSchedule` modula suavemente o beta de sensibilidade e a intensidade de reintroduções externas dentro de cada fase. O número da onda é gravado diariamente em `waveNumber`.
+
+Esse calendário é uma hipótese de design do jogo e não uma reconstrução observada de uma epidemia real.
+
+## 14. Atendimento negado e mortalidade
+
+Casos graves sem vaga acumulam `careDeniedDays`. O risco de morte condicionado à gravidade é aumentado por `unmetCareMortalityPerDeniedDay`, com limite superior de probabilidade.
+
+Quando ocorre um óbito após pelo menos um dia de atendimento negado, o evento registra `deathAssociatedWithUnmetCare=true`. O resumo contém `unmetCareDeaths`.
+
+Isso representa uma associação interna do cenário com falta de capacidade; não é inferência causal sobre políticas reais.
+
+## 15. Vacinação por dose
+
+`vaccinationCampaigns` aceita até três campanhas sequenciais. Cada agente registra `vaccineDoses`, `lastVaccinatedDay` e `vaccineHistory`.
+
+Cada campanha define dose, disponibilidade, doses/dia, adesão, intervalo mínimo, atraso até proteção e proteção contra infecção/gravidade. A proteção efetiva usa a melhor dose já maturada.
+
+Os parâmetros das três doses são hipóteses de cenário, não eficácia de um produto específico.
