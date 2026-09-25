@@ -30,9 +30,10 @@ function compactPopulation(city){
     persons:city.agents.map(p=>({
       id:p.id,age:p.age,ageYears:p.ageYears,region:p.region,
       visualHome:p.visualHome,householdId:p.householdId,
-      school:p.school,schoolEnrolled:p.schoolEnrolled,
+      school:p.school,schoolRegion:p.schoolRegion,schoolEnrolled:p.schoolEnrolled,
       work:p.work,workRegion:p.workRegion,working:p.working,
-      market:p.market,community:p.community,hospital:p.hospital,
+      market:p.market,marketRegion:p.marketRegion,community:p.community,communityRegion:p.communityRegion,
+      hospital:p.hospital,hospitalRegion:p.hospitalRegion,
       healthWorker:p.healthWorker,teacher:p.teacher
     })),
     places:[...city.places.values()]
