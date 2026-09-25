@@ -2,62 +2,68 @@
 
 Simulador experimental de transmissão em uma cidade **inteiramente fictícia**, com mapa vetorial 2D e motor epidemiológico baseado em agentes sintéticos.
 
-## Estado atual
+## Primeira versão jogável — V0.2
 
-- Mapa interativo publicado em GitHub Pages.
-- Motor matemático **v2 data-informed** em `simulator/engine.mjs`.
-- População configurável entre **10 e 30.000 agentes**.
-- Estrutura etária e matrizes de contato do Brasil, duração de contatos POLYMOD, comportamento PNAD COVID, progressão clínica SIVEP-Gripe 2025 e capacidade hospitalar CNES foram incorporados ao conjunto `simulator/data/calibrated_parameters_v2.json`.
-- O motor continua separado do SVG: paciente zero escolhido no mapa, rotas reais e bloqueio individual das três pontes ainda precisam ser conectados à simulação.
+O mapa e o motor v2 agora estão conectados em uma primeira experiência de jogo no GitHub Pages.
 
-## Documentação científica
+O usuário pode:
 
-- [Análise e calibração v2](simulator/docs/CALIBRACAO_V2.md) — bases usadas, transformações, parâmetros, resultados, limitações e benchmark a 30 mil agentes.
-- [Modelo matemático e metodologia](simulator/docs/MODELO_E_METODOLOGIA.md) — equações, estados, rede, hospital, alerta e interpretação.
-- [Protocolo completo de vigilância, transmissão e decisões](docs/METODO_COMPLETO_VIGILANCIA_TRANSMISSAO_DECISOES.md).
-- [Especificação do jogo e integração](docs/ESPECIFICACAO_JOGO_E_INTEGRACAO.md).
-- [Parâmetros e limites das bases](docs/PARAMETROS_E_LIMITES_DAS_BASES.md).
+- escolher entre **10 e 30.000 agentes**;
+- escolher Influenza, COVID-19 ou VSR;
+- escolher transmissibilidade baixa, média ou alta;
+- clicar numa residência ou local público para definir o **foco inicial**;
+- iniciar, pausar, avançar dia a dia e alterar a velocidade;
+- acompanhar atividade recente da infecção nos nós do mapa;
+- observar expostos/infecciosos/internados, novos casos, leitos e óbitos;
+- receber um **alerta de epidemia simulada** quando admissões hospitalares excedem a referência do motor;
+- após o alerta, aplicar fechamento de escolas, home office, fechamento de lazer, restrição de comércio, lockdown ou um cenário de vacinação;
+- recalcular o restante da trajetória mantendo a mesma configuração e semente.
 
-## Motor v2
+A simulação roda em um **Web Worker**, evitando bloquear a interface enquanto o motor calcula populações maiores.
 
-O motor combina uma rede temporal de contatos com estados `S/E/I/H/R/D`. Para cada suscetível, o risco diário acumulado usa:
+Página: https://gabrieldelvaje.github.io/outbreak-city-simulator/
 
-`P(infecção)=1-exp(-Σ beta × duração_do_contato × peso_da_amostragem × suscetibilidade × proteção)`.
+## Como a integração funciona
 
-A frequência e mistura etária dos contatos vêm das matrizes brasileiras; a duração é sorteada por ambiente; a progressão até hospital/desfecho usa distribuições derivadas do SIVEP-Gripe 2025. O hospital pode emitir um **alerta de epidemia simulada** quando admissões excedem uma referência sazonal de SRAG do conjunto de parâmetros.
+O mapa possui sete distritos visuais. Na V0.2 eles são associados às regiões sintéticas do motor. O local escolhido pelo usuário define a região e o tipo de ambiente do primeiro caso:
 
-**Importante:** `beta` absoluto, duração latente/infecciosa, eficácia vacinal e efeitos causais isolados de lockdown/escola/home office continuam como hipóteses de sensibilidade, porque as bases fornecidas não identificam esses valores diretamente.
+- residência → domicílio;
+- escola → camada escolar;
+- empresa/prefeitura → trabalho;
+- mercado/loja/restaurante → varejo;
+- parque/praça → comunidade;
+- hospital → profissional de saúde compatível quando disponível.
 
-## Executar
+Os marcadores residenciais são **agregações visuais**. Portanto, escolher uma casa ancora o paciente zero naquele nó para a interface e no mesmo distrito para o motor, mas ainda não cria uma relação 1:1 permanente entre cada marcador e um único domicílio interno.
 
-Da raiz do repositório, com Node 20+:
+Os eventos gerados pelo motor são projetados de volta nos nós compatíveis do mesmo distrito. A intensidade visual considera infecções recentes, permitindo acompanhar a expansão espacial aproximada sem renderizar 30 mil pessoas simultaneamente.
+
+## Motor epidemiológico
+
+- Motor: [`simulator/engine.mjs`](simulator/engine.mjs)
+- Parâmetros: [`simulator/data/calibrated_parameters_v2.json`](simulator/data/calibrated_parameters_v2.json)
+- Análise/calibração: [`simulator/docs/CALIBRACAO_V2.md`](simulator/docs/CALIBRACAO_V2.md)
+- Metodologia matemática: [`simulator/docs/MODELO_E_METODOLOGIA.md`](simulator/docs/MODELO_E_METODOLOGIA.md)
+- Testes: [`simulator/tests/test_engine.mjs`](simulator/tests/test_engine.mjs)
+- Primeira versão do jogo: [`docs/JOGO_V0_2.md`](docs/JOGO_V0_2.md)
+
+A frequência e mistura etária dos contatos usam matrizes brasileiras; duração de contatos usa distribuições do POLYMOD; comportamento incorpora indicadores da PNAD COVID; progressão hospitalar usa SIVEP-Gripe 2025; capacidade hospitalar usa referência CNES.
+
+## Limitações atuais da V0.2
+
+As pontes Norte, Central e Sul **ainda não alteram as rotas do motor**. Os controles continuam visuais. A próxima etapa espacial é transformar cada ponte em uma aresta individual do grafo viário.
+
+Também permanecem como cenários de sensibilidade os parâmetros não identificados diretamente pelas bases fornecidas, incluindo beta absoluto por hora, período latente/infeccioso e eficácia de uma vacina hipotética.
+
+As decisões do jogador modificam a rede simulada. Seus percentuais de efeito são resultados daquele cenário sintético, e não estimativas causais de políticas reais.
+
+## Executar os testes
 
 ```bash
 node simulator/tests/test_engine.mjs
 node simulator/examples/run_example.mjs
 ```
 
-No código:
-
-```js
-import {configFromProfile, simulate} from './simulator/engine.mjs';
-
-const parameters = await fetch('./simulator/data/calibrated_parameters_v2.json').then(r => r.json());
-const config = configFromProfile(parameters, 'medium', {
-  population: 30000,
-  pathogenId: 'influenza',
-  seed: 42,
-  days: 180
-});
-const result = simulate(config);
-```
-
-## Mapa
-
-Página: https://gabrieldelvaje.github.io/outbreak-city-simulator/
-
-As pontes Norte, Central e Sul já possuem controles visuais no mapa. **Esses controles ainda não recalculam rotas do motor**; a integração espacial será a próxima etapa.
-
 ## Limite científico
 
-O projeto é educacional e exploratório. Resultados são sintéticos e não constituem previsão médica, declaração epidemiológica oficial nem estimativa causal de políticas públicas reais.
+OUTBREAK é um projeto educacional e exploratório. Resultados são sintéticos e não constituem previsão médica, declaração epidemiológica oficial nem recomendação de política pública.
