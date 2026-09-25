@@ -19,6 +19,7 @@ function overridesFrom(setup){
     initialSeedAgentId:setup.initialSeedAgentId,
     initialSeedPlaceId:setup.initialSeedPlaceId,
     interventions:setup.interventions||[],
+    vaccinationCampaigns:setup.vaccinationCampaigns||[],
     parameterSetId:'calibrated_parameters_v2'
   };
   if(setup.vaccination)overrides.vaccination=setup.vaccination;
