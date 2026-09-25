@@ -196,3 +196,44 @@ O conjunto de parâmetros passa a versionar `scenario_assumptions.routine_outing
 Os eventos de infecção agora registram `block` e `visualPlace`, permitindo auditar se uma transmissão ocorreu em casa, escola, trabalho, varejo ou comunidade e projetar o evento no mapa real.
 
 Os testes automatizados também passam a verificar seleção exata do paciente zero, persistência da residência visual, blocos temporais e transmissão domiciliar usando a matriz `home`.
+
+
+## 14. Adendo v2.3 — reinfecção e ondas recorrentes
+
+A v2.3 adiciona duas mecânicas necessárias para evitar que o surto seja obrigatoriamente um processo de onda única: perda de imunidade natural e reintroduções externas.
+
+### Imunidade natural
+
+Os arquivos fornecidos ao projeto não permitem identificar a duração da imunidade esterilizante após infecção para influenza, COVID-19 ou VSR. Por isso, os intervalos em `scenario_assumptions.reinfection_wave_scenarios` são **hipóteses de jogo**.
+
+O conjunto atual usa:
+
+| perfil | mínimo | máximo | status |
+| --- | ---: | ---: | --- |
+| influenza | 60 dias | 100 dias | hipótese |
+| COVID-19 | 75 dias | 120 dias | hipótese |
+| VSR | 45 dias | 90 dias | hipótese |
+
+Esses valores não devem ser citados como estimativas clínicas. Em particular, critérios administrativos/de vigilância usados para classificar possível reinfecção por COVID-19 no SIVEP não são interpretados como duração biológica da imunidade.
+
+### Reintroduções externas
+
+O motor usa uma taxa de tentativas de introdução por 1.000 habitantes/dia:
+
+- influenza: 0,020;
+- COVID-19: 0,015;
+- VSR: 0,020.
+
+O número diário de tentativas é amostrado por Poisson e escala com o tamanho da população.
+
+Essas taxas também são **hipóteses do jogo**. WHO, SIVEP, FluNet, FluID e MERS não identificam diretamente quantas introduções infecciosas ocorreriam por dia numa cidade sintética de 10–30 mil habitantes.
+
+### Vacinação e novas ondas
+
+Recuperados podem receber vacina. Quando a proteção entra em vigor, ela reduz a transmissão em contatos locais e pode impedir que uma tentativa de reintrodução externa resulte em infecção.
+
+A expectativa qualitativa do cenário é, portanto:
+
+`1ª onda → recuperação → queda → perda gradual de imunidade/reintroduções → nova onda potencial → vacinação → redução progressiva da suscetibilidade efetiva`.
+
+Isso é um comportamento do modelo e não uma previsão temporal para epidemias reais.
