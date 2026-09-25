@@ -2809,7 +2809,13 @@
         "min_days_since_previous_dose": 90
       },
       "note": "Dose 3 represents an updated/booster scenario for later variants/strains. Values are not estimates for a specific vaccine."
-    }
+    },
+    "playable_severity_multiplier": 4,
+    "playable_severity_multiplier_status": "GAME_BALANCE_ASSUMPTION_NOT_CLINICAL_ESTIMATE",
+    "playable_severity_multiplier_explanation": "The playable 360-day high-transmission campaign multiplies the PNAD/SIVEP-derived severe-case proxy by 4 so hospital demand is consequential at synthetic-city scale. This is a game-balance parameter, not an observed hospitalization probability.",
+    "unmet_care_daily_death_hazard": 0.055,
+    "unmet_care_daily_death_hazard_status": "GAME_BALANCE_ASSUMPTION_NOT_CLINICAL_ESTIMATE",
+    "unmet_care_daily_death_hazard_explanation": "A severe case that requests a bed and remains without one faces a daily synthetic death hazard while waiting, in addition to the final severity outcome. This is used to make capacity decisions consequential and is not an empirical risk estimate."
   },
   "calibration_notes": {
     "single_year_age_distribution": "Brazil distribution supplied with Prem/epydemix package; terminal 84+ group is represented as age 84 only for synthetic-age assignment while remaining an 84+ open interval in provenance.",
@@ -2821,6 +2827,7 @@
     "city_mixing": "The V0.4 city network intentionally mixes residents across districts through persistent work, school, retail, leisure and hospital destinations. The mixing shares are explicit game-network assumptions, not empirical Brazil or Piracicaba OD estimates.",
     "reinfection_waves": "Recovered agents temporarily enter R and later return to S according to pathogen-specific game-scenario windows. External introductions are modeled as exposure attempts scaled by population; vaccine protection can block a successful imported infection. These settings are scenario mechanics, not estimates from WHO/SIVEP/OxCGRT/PNAD/POLYMOD.",
     "annual_game_campaign": "The playable campaign now spans 360 days in four approximately 90-day wave phases. This resolves the game-design request for four waves in one simulated year; supplied datasets do not support a deterministic four-wave calendar.",
-    "unmet_care": "Severe cases denied a bed accumulate denied-care days. Mortality risk is increased by an explicit scenario multiplier per denied day. This is a game-model consequence of capacity shortage, not a causal estimate of a real policy."
+    "unmet_care": "Severe cases denied a bed accumulate denied-care days. Mortality risk is increased by an explicit scenario multiplier per denied day. This is a game-model consequence of capacity shortage, not a causal estimate of a real policy.",
+    "playable_severity_balance": "V0.8 increases the severe-case proxy in the playable campaign and adds a daily hazard while severe cases wait without a bed. These changes are explicitly game-balance assumptions and must not be cited as real-world clinical estimates."
   }
 }
