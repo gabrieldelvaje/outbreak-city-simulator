@@ -21,7 +21,7 @@
 
 /* Larger graph nodes; animate each circle about its own center. */
 #homes-layer .home-node > circle:first-of-type{
-  r:3.1px;
+  r:4.5px;
   opacity:.96;
   stroke:#fff;
   stroke-width:1px;
@@ -29,14 +29,14 @@
 }
 #homes-layer .home-node:hover > circle:first-of-type,
 #homes-layer .home-node:focus-visible > circle:first-of-type{
-  r:5.6px;
+  r:7px;
   stroke:#fff;
   stroke-width:1.6px;
   opacity:1;
 }
 /* Invisible hit area remains larger than the dot without drawing a ring. */
 #homes-layer .home-node > circle:last-of-type{
-  r:6.2px;
+  r:8.8px;
   stroke:none;
   stroke-width:0;
 }
@@ -47,14 +47,14 @@
 }
 
 #places-layer .map-place > .place-bubble{
-  r:7px;
+  r:9px;
   stroke:#fff;
   stroke-width:1.5px;
   transition:r 340ms cubic-bezier(.22,.7,.22,1),stroke-width 340ms ease;
 }
 #places-layer .map-place:hover > .place-bubble,
 #places-layer .map-place:focus-visible > .place-bubble{
-  r:10.5px;
+  r:12.5px;
   stroke:#fff;
   stroke-width:2px;
 }
