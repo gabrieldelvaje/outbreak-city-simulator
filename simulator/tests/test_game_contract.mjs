@@ -5,6 +5,7 @@ const root=new URL('../../',import.meta.url);
 const html=fs.readFileSync(new URL('index.html',root),'utf8');
 const game=fs.readFileSync(new URL('src/game.js',root),'utf8');
 const worker=fs.readFileSync(new URL('src/simulation-worker.js',root),'utf8');
+const engine=fs.readFileSync(new URL('simulator/engine.mjs',root),'utf8');
 
 for(const id of [
   'game-population','game-population-number','game-prepare','game-disease',
