@@ -2,9 +2,9 @@
 
 Simulador experimental de transmissão em uma cidade **inteiramente fictícia**, com mapa vetorial 2D e motor epidemiológico baseado em agentes sintéticos.
 
-## Versão jogável atual — V0.3
+## Versão jogável atual — V0.4
 
-A V0.3 transforma a população em uma rede persistente antes do início do surto.
+A V0.4 mantém a população persistente da V0.3 e conecta os bairros por destinos habituais de trabalho, escola, comércio, lazer e hospital.
 
 O fluxo atual é: escolher entre **10 e 30.000 agentes** → distribuir a população → abrir uma residência → inspecionar os domicílios e o grafo familiar → escolher uma pessoa específica como paciente zero → iniciar a epidemia → acompanhar a disseminação → tomar decisões após o alerta hospitalar.
 
@@ -31,7 +31,7 @@ O motor 2.1 processa os contatos em quatro blocos temporais:
 
 Fechar escolas ou aplicar home office não remove os agentes da rede: eles permanecem em casa durante o bloco correspondente. Fechar comércio/lazer remove aquela saída. Contatos familiares continuam possíveis.
 
-A frequência e a mistura etária vêm das matrizes brasileiras; a duração dos contatos vem do POLYMOD. A probabilidade diária de realizar uma saída comunitária está explicitamente marcada no JSON como **hipótese de rotina do jogo**, não como estimativa empírica.
+A frequência e a mistura etária vêm das matrizes brasileiras; a duração dos contatos vem do POLYMOD. A probabilidade diária de realizar uma saída comunitária e as frações de destinos fora do bairro de residência estão explicitamente marcadas no JSON como **hipóteses da rede do jogo**, não como estimativas empíricas de mobilidade origem–destino.
 
 ## Motor epidemiológico
 
@@ -39,10 +39,10 @@ A frequência e a mistura etária vêm das matrizes brasileiras; a duração dos
 - Parâmetros: [`simulator/data/calibrated_parameters_v2.json`](simulator/data/calibrated_parameters_v2.json)
 - Análise/calibração: [`simulator/docs/CALIBRACAO_V2.md`](simulator/docs/CALIBRACAO_V2.md)
 - Metodologia: [`simulator/docs/MODELO_E_METODOLOGIA.md`](simulator/docs/MODELO_E_METODOLOGIA.md)
-- Jogo V0.3: [`docs/JOGO_V0_3.md`](docs/JOGO_V0_3.md)
+- Jogo V0.4: [`docs/JOGO_V0_4.md`](docs/JOGO_V0_4.md)
 - Testes: [`simulator/tests/test_engine.mjs`](simulator/tests/test_engine.mjs)
 
-**Versão do motor:** `2.1.0-spatial-routines`.
+**Versão do motor:** `2.2.0-city-mixing`.
 
 ## Limitações atuais
 
