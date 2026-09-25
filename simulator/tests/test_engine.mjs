@@ -79,5 +79,9 @@ const imported=simulate({...base,beta:0,initialInfections:0,externalImportationR
 assert.ok(imported.summary.everInfected>0,'external importation can reseed the city when explicitly enabled');
 const cases=simulate({...base,seed:7,symptomaticProbability:1,severeProbabilityByAge:{child:1,adult:1,older:1},beds:600,beta:0,initialInfections:20,days:40});
 assert.ok(cases.summary.hospitalAdmissions>0,'severe symptomatic cases should reach hospital using empirical delay PMFs');
+const maxPopulationCfg=configFromProfile(params,'low',{population:30000,days:1,seed:9090,pathogenId:'influenza',regions:2,spatialModel});
+const maxPopulationCity=makeCity(maxPopulationCfg);
+assert.equal(maxPopulationCity.agents.length,30000,'maximum configured population must be constructible');
+assert.ok(new Set(maxPopulationCity.agents.map(p=>p.householdId)).size>1000,'maximum population must remain split into many persistent households');
 const summary=summarizeRuns([r1,r2]); assert.equal(summary.runs,2);
 console.log('OUTBREAK v2 tests passed', {contacts:base.contactMatrices.home.length, admissions:cases.summary.hospitalAdmissions, alert:cases.summary.alertDay});
