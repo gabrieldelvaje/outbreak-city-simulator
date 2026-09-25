@@ -11,16 +11,28 @@ const make=(tag,attributes,parent)=>{
 };
 const toWorld=(x,y)=>({x:MAP.x+MAP.scale*x,y:MAP.y+MAP.scale*y});
 
-// All coordinates are in the original 740 x 740 map reference space. The block
-// lies below the central park, west of the river, between the existing streets.
-// Give the shopping its own NEW rectangular footprint instead of occupying an
-// existing residential building.
-const shoppingLot={x:291,y:439,width:40,height:27};
+// All coordinates are in the original 740 x 740 reference space.
+//
+// The peninsula is split by a diagonal local street. New homes stay inside the
+// western block and follow the same diagonal direction as the surrounding roads.
+// The shopping occupies the separate eastern block, completely clear of the
+// diagonal street and the riverside road.
+const shoppingLot={cx:332,cy:443,width:30,height:21,angle:-8};
+
+// A compact 3 x 3 residential pattern. These are deliberately inset from every
+// street edge so neither roofs nor graph nodes sit on top of a roadway.
 const residentialLots=[
-  [239,427,13,9],[257,429,13,9],[275,429,12,9],
-  [240,445,13,9],[258,447,13,9],[275,449,11,9],
-  [238,464,13,9],[256,466,13,9],[274,469,12,9],
-  [291,477,13,9],[310,477,13,9]
+  {cx:240,cy:423,width:12,height:8,angle:18},
+  {cx:258,cy:429,width:12,height:8,angle:18},
+  {cx:276,cy:435,width:12,height:8,angle:18},
+
+  {cx:235,cy:441,width:12,height:8,angle:18},
+  {cx:253,cy:447,width:12,height:8,angle:18},
+  {cx:271,cy:453,width:12,height:8,angle:18},
+
+  {cx:230,cy:459,width:12,height:8,angle:18},
+  {cx:248,cy:465,width:12,height:8,angle:18},
+  {cx:266,cy:471,width:12,height:8,angle:18}
 ];
 
 function homeAt(homes,x,y,serial){
@@ -36,6 +48,14 @@ function homeAt(homes,x,y,serial){
   make('circle',{cx:x,cy:y,r:4.5,fill:'transparent','pointer-events':'all'},node);
 }
 
+function lotRect(parent,{cx,cy,width,height,angle},attrs={}){
+  return make('rect',{
+    x:-width/2,y:-height/2,width,height,rx:.5,
+    transform:`translate(${cx} ${cy}) rotate(${angle})`,
+    ...attrs
+  },parent);
+}
+
 function run(){
   const frame=document.getElementById('reference-city');
   const homes=frame?.querySelector('#homes-layer');
@@ -48,16 +68,21 @@ function run(){
 
   // The previous shopping occupied a genuine old roof. Remove ONLY the added
   // commercial tint; the original gray reference roof remains underneath it.
-  // Its former commercial node becomes a residential node at the same center.
+  // Its former commercial node becomes residential again.
   const oldBox=oldRoof.getBBox();
   const previous={x:oldBox.x+oldBox.width/2,y:oldBox.y+oldBox.height/2};
   oldRoof.remove();
 
-  // Add the new roof layer behind both homes and public-place pins.
-  const roofs=make('g',{id:'peninsula-infill-roofs','aria-label':'Novos lotes residenciais e comerciais do Centro'},frame);
+  // Put the synthetic roof layer behind graph nodes and place pins.
+  const roofs=make('g',{
+    id:'peninsula-infill-roofs',
+    'aria-label':'Novos lotes residenciais e comerciais do Centro'
+  },frame);
   frame.insertBefore(roofs,homes);
+
   let serial=Math.max(0,...[...homes.querySelectorAll('[data-home]')]
     .map(node=>Number(node.dataset.home.replace('casa-',''))||0));
+
   const occupied=[...homes.querySelectorAll('.home-node')].map(node=>{
     const dot=node.querySelector('circle');
     return dot?{x:Number(dot.getAttribute('cx')),y:Number(dot.getAttribute('cy'))}:null;
@@ -70,42 +95,57 @@ function run(){
     occupied.push(previous);
   }
 
-  // Separate, modest rectangular roofs make the previously empty peninsula
-  // look urbanized. Don't remove or relocate existing houses, streets or parks.
-  for(const [x,y,width,height] of residentialLots){
-    const cx=x+width/2,cy=y+height/2;
-    if(occupied.some(p=>Math.hypot(p.x-cx,p.y-cy)<9))continue;
-    make('rect',{
-      x,y,width,height,rx:.5,fill:'#c1c1c1',stroke:'#f8f8f8',
-      'stroke-width':.8,'pointer-events':'none'
-    },roofs);
+  // Residential roofs now match the exact base-map building color and have no
+  // artificial white outline. Their common rotation follows the block/street grid.
+  for(const lot of residentialLots){
+    const {cx,cy}=lot;
+    if(occupied.some(p=>Math.hypot(p.x-cx,p.y-cy)<8))continue;
+
+    lotRect(roofs,lot,{
+      fill:'#c1c1c1',
+      stroke:'none',
+      'pointer-events':'none'
+    });
+
     serial++;
     homeAt(homes,cx,cy,serial);
     occupied.push({x:cx,y:cy});
   }
 
-  // New dedicated shopping building: real rectangle, not a marker hovering
-  // over an existing home. Its place ID and click-to-inspect behavior persist.
-  const {x,y,width,height}=shoppingLot;
-  const cx=x+width/2,cy=y+height/2;
-  const roof=make('rect',{
-    x,y,width,height,rx:.7,fill:'#c1c1c1',stroke:'#f8f8f8',
-    'stroke-width':1.1,'pointer-events':'none'
-  },shopping);
+  // Dedicated shopping building, fully inside the eastern block. The footprint
+  // is smaller and rotated with the street instead of crossing either roadway.
+  const {cx,cy}=shoppingLot;
+  const roof=lotRect(shopping,shoppingLot,{
+    fill:'#c1c1c1',
+    stroke:'none',
+    'pointer-events':'none'
+  });
   shopping.insertBefore(roof,pin);
-  const tint=make('rect',{
-    x:x+1.2,y:y+1.2,width:width-2.4,height:height-2.4,rx:.5,
-    fill:'#8a76c8','fill-opacity':.52,'pointer-events':'none'
-  },shopping);
+
+  const tint=lotRect(shopping,{
+    ...shoppingLot,
+    width:shoppingLot.width-2.2,
+    height:shoppingLot.height-2.2
+  },{
+    fill:'#8a76c8',
+    'fill-opacity':.52,
+    stroke:'none',
+    'pointer-events':'none'
+  });
   shopping.insertBefore(tint,pin);
+
   pin.setAttribute('transform',`translate(${cx} ${cy})`);
   const label=shopping.querySelector(':scope > .place-label');
-  if(label){label.setAttribute('x',cx);label.setAttribute('y',y+height+11);}
+  if(label){
+    label.setAttribute('x',cx);
+    label.setAttribute('y',cy+shoppingLot.height/2+10);
+  }
+
   const record=places.find(place=>place.id==='shopping-peninsula');
   if(record){
     Object.assign(record,toWorld(cx,cy),{
       region:'centro-civico',
-      description:'Shopping instalado em um novo edifício retangular na área adensada da península central.'
+      description:'Shopping instalado inteiramente no quarteirão comercial da península central, sem sobrepor as vias.'
     });
   }
   return true;
