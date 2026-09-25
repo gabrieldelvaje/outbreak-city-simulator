@@ -64,3 +64,8 @@
   #homes-layer .home-node > circle:first-of-type,
   #places-layer .map-place > .place-bubble{transition:none}
 }
+
+/* Soft depth beneath public-place pins in light mode only; leave dark mode untouched. */
+html:not([data-theme="dark"]) #places-layer .place-pin-shape {
+  filter:drop-shadow(0 2px 3px rgba(20,37,59,.23)) !important;
+}
