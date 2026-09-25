@@ -2,7 +2,7 @@
 
 Simulador experimental de transmissão em uma cidade **inteiramente fictícia**, com mapa vetorial 2D e motor epidemiológico baseado em agentes sintéticos.
 
-## Versão jogável atual — V0.7
+## Versão jogável atual — V0.8
 
 A campanha agora acompanha **360 dias** e divide o ano de jogo em quatro fases de onda de aproximadamente 90 dias. A transmissibilidade da experiência jogável é sempre **alta**; o jogador escolhe apenas nome da cidade, população entre 10 e **20.000** pessoas e vírus (Influenza, COVID-19 ou VSR).
 
@@ -26,7 +26,7 @@ Casos graves solicitam leito. Se a capacidade for atingida, o agente acumula dia
 
 A ação **Ampliar leitos** aumenta a capacidade em 25% da capacidade disponível no momento da decisão e pode ser escolhida novamente em crises posteriores.
 
-Esse mecanismo é hipotético e não estima causalmente a mortalidade real de um sistema de saúde.
+Esse mecanismo é hipotético e não estima causalmente a mortalidade real de um sistema de saúde. Na V0.8, o cenário jogável usa um multiplicador explícito de gravidade e um risco diário durante espera por leito para que a ausência de decisões possa produzir sobrecarga e mortalidade relevantes em escala de jogo.
 
 ## Vacinação em três etapas
 
@@ -44,10 +44,10 @@ Cada dose possui atraso até proteção e níveis de proteção contra infecçã
 - Parâmetros: [`simulator/data/calibrated_parameters_v2.json`](simulator/data/calibrated_parameters_v2.json)
 - Metodologia: [`simulator/docs/MODELO_E_METODOLOGIA.md`](simulator/docs/MODELO_E_METODOLOGIA.md)
 - Calibração e limites: [`simulator/docs/CALIBRACAO_V2.md`](simulator/docs/CALIBRACAO_V2.md)
-- Jogo V0.7: [`docs/JOGO_V0_7.md`](docs/JOGO_V0_7.md)
+- Jogo V0.8: [`docs/JOGO_V0_8.md`](docs/JOGO_V0_8.md)
 - Testes: [`simulator/tests/test_engine.mjs`](simulator/tests/test_engine.mjs)
 
-**Versão do motor:** `2.4.0-year-waves`.
+**Versão do motor:** `2.5.0-severity-report`.
 
 ## Limitações atuais
 
@@ -66,3 +66,24 @@ node simulator/tests/test_decision_checkpoints.mjs
 ## Limite científico
 
 OUTBREAK é educacional e exploratório. Resultados são sintéticos e não constituem previsão médica, declaração epidemiológica oficial nem recomendação de política pública.
+
+
+## Relatório final contrafactual
+
+No Dia 360, o jogo executa um segundo cenário com **a mesma população, seed, vírus e paciente zero**, mas remove todas as intervenções, ampliações de leito e campanhas vacinais.
+
+O relatório final compara a partida real com esse cenário “sem ação” em:
+
+- pessoas infectadas;
+- episódios totais e reinfecções;
+- internações e pico de internados;
+- dias de sobrecarga hospitalar;
+- pessoas sem leito;
+- óbitos após falta de leito;
+- óbitos totais.
+
+A comparação é um contrafactual **do próprio simulador**, não uma estimativa causal de políticas reais.
+
+## Mapa
+
+Os marcadores epidemiológicos mantêm o tamanho original do SVG. A intensidade é comunicada apenas por cor: amarelo → laranja → vermelho, usando infecções recentes normalizadas pelo número de agentes vinculados ao nó.
