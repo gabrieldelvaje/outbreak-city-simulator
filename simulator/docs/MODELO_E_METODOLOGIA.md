@@ -1,6 +1,6 @@
 # OUTBREAK — modelo matemático e metodologia
 
-**Versão do motor:** `2.4.0-year-waves`  
+**Versão do motor:** `2.5.0-severity-report`  
 **Conjunto principal:** `../data/calibrated_parameters_v2.json`
 
 A análise das bases e limitações está em [CALIBRACAO_V2.md](CALIBRACAO_V2.md). A mecânica atual da interface está em [../../docs/JOGO_V0_7.md](../../docs/JOGO_V0_7.md).
@@ -200,3 +200,24 @@ Isso representa uma associação interna do cenário com falta de capacidade; n�
 Cada campanha define dose, disponibilidade, doses/dia, adesão, intervalo mínimo, atraso até proteção e proteção contra infecção/gravidade. A proteção efetiva usa a melhor dose já maturada.
 
 Os parâmetros das três doses são hipóteses de cenário, não eficácia de um produto específico.
+
+
+## 16. Balanceamento de gravidade V0.8
+
+O perfil jogável aplica `playableSeverityMultiplier=4` ao proxy de probabilidade de caso grave/hospitalar construído a partir dos componentes já documentados. O objetivo é tornar a capacidade hospitalar uma restrição material durante uma campanha sintética de 360 dias.
+
+**Status:** `GAME_BALANCE_ASSUMPTION_NOT_CLINICAL_ESTIMATE`.
+
+Casos graves sem vaga passam por um hazard diário adicional `unmetCareDailyDeathHazard=0.055`, crescente com os dias sucessivos sem atendimento e limitado a 0,45 por dia no motor.
+
+Esse mecanismo foi introduzido para o jogo e não deve ser usado como estimativa clínica.
+
+## 17. Relatório contrafactual interno
+
+Ao final da campanha, a interface solicita ao Worker uma segunda execução com mesma seed, população e paciente zero, removendo:
+
+- intervenções;
+- ampliações de leito;
+- vacinação.
+
+O relatório compara os dois resultados. Como ambas as trajetórias são saídas do mesmo modelo, a diferença é descrita como **efeito contrafactual simulado**, e não como eficácia causal observada de política pública.
