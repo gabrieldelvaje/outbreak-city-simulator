@@ -6,7 +6,7 @@ const parameters=JSON.parse(
 );
 
 const cfg=configFromProfile(parameters,'medium',{
-  population:5000,
+  population:1200,
   pathogenId:'influenza',
   days:120,
   seed:456,
@@ -27,5 +27,5 @@ const result=simulate(cfg);
 console.log('EXEMPLO SINTÉTICO V2 — não é previsão:',JSON.stringify(result.summary,null,2));
 console.log('Primeiros 10 dias:',JSON.stringify(result.daily.slice(0,10),null,2));
 
-const draws=Array.from({length:10},(_,i)=>simulate({...cfg,seed:100+i}));
-console.log('Comparação entre 10 sementes:',summarizeRuns(draws));
+const draws=Array.from({length:5},(_,i)=>simulate({...cfg,seed:100+i}));
+console.log('Comparação entre 5 sementes:',summarizeRuns(draws));
