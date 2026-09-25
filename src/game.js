@@ -529,8 +529,9 @@ function renderDay(day){
   $('game-hospitalized').textContent=nfmt(d.H);
   $('game-deaths').textContent=nfmt(d.D);
   $('game-beds').textContent=`${nfmt(d.bedsOccupied)} / ${nfmt(d.bedCapacity)}`;
-  $('game-attack').textContent=pct(d.R+d.D+d.E+d.I+d.H,Number(populationNumber.value))+'%';
+  $('game-attack').textContent=pct(d.cumulativeUniqueInfected,Number(populationNumber.value))+'%';
   $('game-new').textContent=nfmt(d.newInfections);
+  $('game-reinfections').textContent=nfmt(d.cumulativeReinfections);
   const reached=new Set(state.result.events.filter(e=>e.type==='infection'&&e.day<=state.currentDay&&Number.isInteger(e.targetRegion)).map(e=>e.targetRegion)).size;
   $('game-regions').textContent=`${reached} / ${districts.length}`;
   $('game-progress').style.width=(state.currentDay/(state.result.daily.length-1)*100)+'%';
@@ -578,7 +579,7 @@ function resetGame(){
   focusText.textContent='Distribua a população primeiro';
   alertBox.classList.remove('active');alertText.textContent='O hospital ainda não detectou excesso de casos.';
   $('game-day').textContent='Dia —';
-  for(const id of ['game-active','game-hospitalized','game-deaths','game-new','game-regions'])$(id).textContent='—';
+  for(const id of ['game-active','game-hospitalized','game-deaths','game-new','game-regions','game-reinfections'])$(id).textContent='—';
   $('game-beds').textContent='—';$('game-attack').textContent='—';$('game-progress').style.width='0%';
   decisionLog.replaceChildren();inspector.hidden=true;resetAppliedButtons();unlockDecisions(false);
   $('game-status').textContent='Configuração da cidade';
