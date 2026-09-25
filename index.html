@@ -15,14 +15,14 @@
 <body>
   <div class="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><strong>OUTBREAK</strong><small>CITY NETWORK SIMULATOR <span class="alpha">JOGO · V0.2</span></small></div></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><strong>OUTBREAK</strong><small>CITY NETWORK SIMULATOR <span class="alpha">JOGO · V0.3</span></small></div></div>
       <div class="top-actions"><span class="status-dot" aria-hidden="true"></span><span class="status-label" id="game-status">Configuração da cidade</span><button class="ghost" id="reset-view" type="button">Centralizar mapa</button><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Ativar modo escuro" aria-pressed="false" title="Ativar modo escuro"><span class="theme-toggle__icon" aria-hidden="true">☾</span><span class="theme-toggle__label">Modo escuro</span></button></div>
     </header>
 
     <main class="workspace">
       <aside class="sidebar" aria-label="Controles da simulação">
         <p class="eyebrow">01 / SIMULAR</p><h1>Comece o surto.<br>Controle a cidade.</h1>
-        <p class="intro">Escolha a população e a doença, clique no mapa para definir o paciente zero e acompanhe o surto até o hospital detectar excesso de casos.</p>
+        <p class="intro">Primeiro distribua a população pela cidade. Depois abra uma residência, veja a família e escolha uma pessoa específica como paciente zero.</p>
 
         <div class="game-panel">
           <section class="game-card">
@@ -30,9 +30,10 @@
             <label class="game-field"><span>População sintética</span><div class="game-field-row"><input id="game-population" type="range" min="10" max="30000" step="10" value="5000"><input id="game-population-number" type="number" min="10" max="30000" step="10" value="5000"></div></label>
             <label class="game-field"><span>Doença</span><select id="game-disease"><option value="influenza">Influenza</option><option value="covid19">COVID-19</option><option value="rsv">VSR</option></select></label>
             <label class="game-field"><span>Transmissibilidade</span><select id="game-transmissibility"><option value="low">Baixa</option><option value="medium" selected>Média</option><option value="high">Alta</option></select></label>
-            <div class="game-focus-label">Foco inicial</div><div class="game-focus" id="game-focus">Clique em uma casa ou local público</div>
-            <button class="game-start" id="game-start" type="button">Iniciar surto</button>
-            <div class="game-message" id="game-message" aria-live="polite">Escolha o foco inicial no mapa.</div>
+            <button class="game-prepare" id="game-prepare" type="button">Distribuir população</button>
+            <div class="game-focus-label">Paciente zero</div><div class="game-focus" id="game-focus">Distribua a população primeiro</div>
+            <button class="game-start" id="game-start" type="button" disabled>Iniciar surto</button>
+            <div class="game-message" id="game-message" aria-live="polite">Defina o tamanho da população e distribua os agentes pela cidade.</div>
           </section>
 
           <section class="game-card">
@@ -72,7 +73,7 @@
         <label class="switch-row"><span><b>Fluxos de mobilidade</b><small>Rotas ilustrativas entre as margens</small></span><input id="toggle-flows" type="checkbox"></label>
         <div class="section-label">PONTES</div>
         <div id="bridge-controls" class="bridge-controls"></div>
-        <p class="caveat">Primeira versão jogável: as pontes ainda são controles visuais e não recalculam as rotas epidemiológicas.</p>
+        <p class="caveat">V0.3: famílias, escola, trabalho e saídas comunitárias já têm vínculos persistentes. As pontes ainda não recalculam rotas individualmente.</p>
         <div class="sidebar-footer"><span class="chip"><i class="dot blue"></i> Rio central</span><span class="chip"><i class="dot green"></i> Parques</span><span class="chip"><i class="dot amber"></i> Vias principais</span></div>
       </aside>
 
