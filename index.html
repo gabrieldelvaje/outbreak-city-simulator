@@ -15,7 +15,7 @@
 <body>
   <div class="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><strong>OUTBREAK</strong><small>CITY NETWORK SIMULATOR <span class="alpha">JOGO · V0.7</span></small></div></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><strong>OUTBREAK</strong><small>CITY NETWORK SIMULATOR <span class="alpha">JOGO · V0.8</span></small></div></div>
       <div class="top-actions"><span class="status-dot" aria-hidden="true"></span><span class="status-label" id="game-status">Aguardando configuração</span><button class="ghost" id="reset-view" type="button">Centralizar mapa</button><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Ativar modo escuro" aria-pressed="false"><span class="theme-toggle__icon" aria-hidden="true">☾</span><span class="theme-toggle__label">Modo escuro</span></button></div>
     </header>
 
@@ -106,6 +106,21 @@
               <button type="button" data-action="none">Continuar sem ação</button>
             </div>
             <small class="modal-note">As opções mostradas dependem do momento da epidemia e das decisões já tomadas.</small>
+          </div>
+        </div>
+
+        <div class="game-overlay" id="final-report-overlay" hidden>
+          <div class="game-modal game-modal--report">
+            <p class="eyebrow">RELATÓRIO FINAL · 360 DIAS</p>
+            <h2 id="final-report-title">Como suas decisões mudaram o cenário?</h2>
+            <p id="final-report-summary">Calculando o cenário contrafactual sem nenhuma ação pública…</p>
+            <div class="report-comparison" id="final-report-comparison"></div>
+            <div class="report-decisions">
+              <strong>Decisões tomadas</strong>
+              <ul id="final-report-decisions"></ul>
+            </div>
+            <p class="modal-note">Comparação sintética com a mesma população, seed e paciente zero, retirando intervenções, ampliação de leitos e vacinação. Não representa eficácia causal observada no mundo real.</p>
+            <div class="report-actions"><button class="game-start" id="final-report-close" type="button">Voltar ao mapa</button><button class="game-prepare" id="final-report-restart" type="button">Nova partida</button></div>
           </div>
         </div>
 
