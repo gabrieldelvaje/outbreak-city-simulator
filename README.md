@@ -2,88 +2,65 @@
 
 Simulador experimental de transmissão em uma cidade **inteiramente fictícia**, com mapa vetorial 2D e motor epidemiológico baseado em agentes sintéticos.
 
-## Versão jogável atual — V0.6
+## Versão jogável atual — V0.7
 
-A V0.6 mantém população persistente, mobilidade interbairros, reinfecções e novas ondas e acrescenta **pausas progressivas de decisão conforme a situação piora**.
-
-O fluxo atual é: escolher entre **10 e 30.000 agentes** → distribuir a população → abrir uma residência → inspecionar domicílios e grafo familiar → escolher uma pessoa específica como paciente zero → iniciar a epidemia → acompanhar disseminação e novas ondas → tomar decisões após o alerta hospitalar.
+A campanha agora acompanha **360 dias** e divide o ano de jogo em quatro fases de onda de aproximadamente 90 dias. A transmissibilidade da experiência jogável é sempre **alta**; o jogador escolhe apenas nome da cidade, população entre 10 e **20.000** pessoas e vírus (Influenza, COVID-19 ou VSR).
 
 Página: https://gabrieldelvaje.github.io/outbreak-city-simulator/
 
-## População, rotina e cidade conectada
+## Fluxo da interface
 
-Cada agente recebe idade/faixa etária, `householdId`, nó residencial `visualHome`, escola, trabalho, mercado habitual, destino comunitário e hospital de referência.
+A configuração aparece em uma janela sobre o mapa. Depois de distribuir a população, a configuração desaparece e o jogador escolhe o epicentro/paciente zero diretamente nos grafos de residências ou locais públicos. Ao iniciar o surto, abre-se o HUD lateral com o contador contínuo, a onda atual, indicadores, vacinação e histórico de decisões.
 
-Trabalho, escola, comércio, lazer e hospital podem estar fora do bairro de residência. Pessoas de bairros distintos se encontram nesses locais e retornam aos próprios domicílios, conectando a cidade epidemiologicamente.
+As decisões públicas aparecem em janelas sobre o mapa e pausam a linha do tempo. O jogador escolhe uma medida ou **Continuar sem ação**.
 
-O dia é processado em quatro blocos:
+## Campanha anual e ondas
 
-- `home_morning`;
-- `daytime`;
-- `evening_outing`;
-- `home_night`.
+O motor usa quatro janelas de 90 dias, com modulação suave da pressão de transmissão e reintroduções externas. O calendário de quatro ondas é uma **mecânica de cenário**, não uma previsão epidemiológica derivada das bases.
 
-## Reinfecção e ondas
+A população mantém famílias, escola, trabalho, comércio, lazer e hospital persistentes, com mobilidade entre bairros. Recuperados podem perder imunidade e ser reinfectados.
 
-O estado `R` não é mais necessariamente terminal. Após a recuperação, cada agente recebe uma janela temporária de imunidade natural. Quando essa janela termina:
+## Hospital
 
-`R → S`
+Casos graves solicitam leito. Se a capacidade for atingida, o agente acumula dias de atendimento negado. O risco de morte aumenta no cenário conforme esses dias se acumulam. O painel separa **óbitos associados no modelo à falta de leito**.
 
-A pessoa volta a ser suscetível e pode adquirir uma nova infecção.
+A ação **Ampliar leitos** aumenta a capacidade em 25% da capacidade disponível no momento da decisão e pode ser escolhida novamente em crises posteriores.
 
-Cada episódio guarda `episode` e `reinfection`, e o painel mostra **reinfecções acumuladas** separadamente do percentual de pessoas que já foram infectadas pelo menos uma vez.
+Esse mecanismo é hipotético e não estima causalmente a mortalidade real de um sistema de saúde.
 
-O motor também possui reintroduções externas proporcionais ao tamanho da população. Elas representam pressão infecciosa proveniente de fora da cidade fictícia e ajudam a iniciar novas cadeias depois de períodos de baixa circulação.
+## Vacinação em três etapas
 
-A vacinação pode atingir suscetíveis **e recuperados**. Depois do atraso para proteção, ela reduz a probabilidade de infecção em contatos locais e também a chance de uma tentativa de reintrodução externa resultar em infecção bem-sucedida.
+A V0.7 usa campanhas separadas:
 
-## Importante sobre os parâmetros de ondas
+- 1ª dose — disponível na 2ª onda;
+- 2ª dose — janela posterior, respeitando intervalo mínimo;
+- 3ª dose/reforço — disponível mais tarde como cenário para novas cepas/variantes.
 
-As bases fornecidas ao projeto **não identificam de forma defensável** a duração da imunidade esterilizante após infecção nem a frequência de introduções infecciosas vindas de fora da cidade.
+Cada dose possui atraso até proteção e níveis de proteção contra infecção e gravidade. Esses valores estão marcados como **hipóteses de jogo não específicas de produto** em `calibrated_parameters_v2.json`.
 
-Por isso, as janelas de imunidade e taxas de reintrodução estão em `scenario_assumptions.reinfection_wave_scenarios` e são marcadas como:
-
-`GAME_ASSUMPTION_NOT_IDENTIFIED_BY_SUPPLIED_DATA`.
-
-Elas são mecânicas de cenário do jogo, não estimativas clínicas.
-
-## Motor epidemiológico
+## Motor e documentação
 
 - Motor: [`simulator/engine.mjs`](simulator/engine.mjs)
 - Parâmetros: [`simulator/data/calibrated_parameters_v2.json`](simulator/data/calibrated_parameters_v2.json)
-- Análise/calibração: [`simulator/docs/CALIBRACAO_V2.md`](simulator/docs/CALIBRACAO_V2.md)
 - Metodologia: [`simulator/docs/MODELO_E_METODOLOGIA.md`](simulator/docs/MODELO_E_METODOLOGIA.md)
-- Jogo V0.6: [`docs/JOGO_V0_6.md`](docs/JOGO_V0_6.md)
+- Calibração e limites: [`simulator/docs/CALIBRACAO_V2.md`](simulator/docs/CALIBRACAO_V2.md)
+- Jogo V0.7: [`docs/JOGO_V0_7.md`](docs/JOGO_V0_7.md)
 - Testes: [`simulator/tests/test_engine.mjs`](simulator/tests/test_engine.mjs)
 
-**Versão do motor:** `2.3.0-reinfection-waves`.
-
-## Pausas progressivas de decisão
-
-Depois que o hospital detecta a epidemia, o jogo não oferece apenas uma decisão inicial. A linha do tempo pode parar novamente quando o cenário cruza marcos de piora:
-
-- alerta hospitalar inicial;
-- aceleração da transmissão;
-- disseminação ampla pelos bairros;
-- ocupação hospitalar de pelo menos 50%;
-- ocupação hospitalar de pelo menos 80%;
-- recrudescimento/nova onda após uma queda importante.
-
-Em cada pausa, o jogador escolhe uma medida disponível ou **Continuar sem ação**. Sem uma escolha explícita, o tempo não avança.
-
-Os limiares adicionais são regras de progressão do jogo e não critérios epidemiológicos oficiais.
+**Versão do motor:** `2.4.0-year-waves`.
 
 ## Limitações atuais
 
-As pontes Norte, Central e Sul ainda não são arestas individuais das rotas. A mobilidade entre bairros já existe no motor, mas ainda não percorre fisicamente uma ponte específica.
+As pontes Norte, Central e Sul ainda não são arestas individuais das rotas. Também permanecem como hipóteses/sensibilidade o beta absoluto, latência/duração infecciosa, calendário exato das quatro ondas, eficácia das doses hipotéticas, duração da imunidade, reintroduções externas e incremento de mortalidade por atendimento negado.
 
-Também permanecem como hipóteses/sensibilidade beta absoluto por hora, períodos latente/infeccioso, eficácia da vacina hipotética, duração da imunidade natural, taxa de reintrodução externa e efeito causal isolado de políticas.
+As políticas alteram a rede e a capacidade e, portanto, alteram os desfechos do cenário. O simulador não atribui um óbito individual a uma política específica sem comparação contrafactual.
 
 ## Executar os testes
 
 ```bash
 node simulator/tests/test_engine.mjs
-node simulator/examples/run_example.mjs
+node simulator/tests/test_game_contract.mjs
+node simulator/tests/test_decision_checkpoints.mjs
 ```
 
 ## Limite científico
