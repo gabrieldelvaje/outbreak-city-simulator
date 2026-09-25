@@ -183,8 +183,8 @@ function isSelected(person,pol){return person.compliance<(pol.fraction??1);}
 const eligible=(a,cfg,type,day)=>applicable(cfg,type,day,a.region).some(p=>isSelected(a,p));
 function pmfSample(pmf,rand){if(!Array.isArray(pmf)||!pmf.length)return null;return weightedIndex(pmf,rand);}
 function clinicalPmf(cfg,key,age){return cfg.clinicalProfile?.[key]?.[age]??null;}
-function durationSample(cfg,layer,rand){let key=layer==='retail'||layer==='hospital'?'community':layer;const obj=cfg.durationProbabilities?.[key];if(!obj)return 1;const probs=cfg.durationCategories.map(c=>obj[c]??0);const i=weightedIndex(probs,rand);return cfg.durationHours[i<0?0:i]??1;}
-function matrixForLayer(cfg,layer){let key=layer;if(layer==='retail'||layer==='hospital')key='community';const m=cfg.contactMatrices?.[key];if(!m)return null;let scale=1;if(layer==='retail')scale=cfg.communityAllocation?.retail??.44;else if(layer==='community')scale=cfg.communityAllocation?.community??.56;else if(layer==='hospital')scale=cfg.hospitalContactScale??0;return m.map(row=>row.map(x=>x*scale));}
+function durationSample(cfg,layer,rand){let key=layer==='household'?'home':(layer==='retail'||layer==='hospital'?'community':layer);const obj=cfg.durationProbabilities?.[key];if(!obj)return 1;const probs=cfg.durationCategories.map(c=>obj[c]??0);const i=weightedIndex(probs,rand);return cfg.durationHours[i<0?0:i]??1;}
+function matrixForLayer(cfg,layer){let key=layer;if(layer==='household')key='home';else if(layer==='retail'||layer==='hospital')key='community';const m=cfg.contactMatrices?.[key];if(!m)return null;let scale=1;if(layer==='retail')scale=cfg.communityAllocation?.retail??.44;else if(layer==='community')scale=cfg.communityAllocation?.community??.56;else if(layer==='hospital')scale=cfg.hospitalContactScale??0;return m.map(row=>row.map(x=>x*scale));}
 function alertExpected(cfg,day){const week=((cfg.startEpiWeek-1+Math.floor(day/7))%52)+1;const rate=Number(cfg.alert.weeklyBaselinePer100k?.[String(week)]??0);return {week,expected:rate*cfg.population/100000};}
 export function simulate(config,options={}){
  const cfg=requireValid(structuredClone(config));
