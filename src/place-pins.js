@@ -1,9 +1,10 @@
-// Public places use map pins with category icons; only hospitals use the letter H.
-// Residential graph dots, existing building footprints and click handlers stay intact.
+// Map pins use the same silhouette in both themes, with a filled category disc.
+// Only hospitals use H. House graph nodes, map geometry and place interactions stay intact.
 import {places,placeColors} from './city-data.js';
 
 const NS='http://www.w3.org/2000/svg';
 const typeById=new Map(places.map(place=>[place.id,place.type]));
+const darkDiscColors={school:'#9bc8f0',market:'#f0bc88',hospital:'#eea0aa',civic:'#b3c7dd',office:'#bcafe3',park:'#acd9b7'};
 const svg=(tag,attributes,parent)=>{
   const node=document.createElementNS(NS,tag);
   for(const [name,value] of Object.entries(attributes))node.setAttribute(name,String(value));
@@ -13,12 +14,11 @@ const svg=(tag,attributes,parent)=>{
 
 function drawIcon(parent,type){
   if(type==='hospital'){
-    const letter=svg('text',{x:0,y:-19.7,'font-size':12.5,'font-weight':800,'text-anchor':'middle',fill:'#263446','pointer-events':'none'},parent);
+    const letter=svg('text',{x:0,y:-19.7,'font-size':12.5,'font-weight':800,'text-anchor':'middle',fill:'currentColor','pointer-events':'none'},parent);
     letter.textContent='H';
     return;
   }
-  // All other icons share a 24x24 coordinate grid, centered in the white pin disc.
-  const icon=svg('g',{transform:'translate(-8.4 -32.4) scale(.7)',fill:'none',stroke:'#263446','stroke-width':2,'stroke-linecap':'round','stroke-linejoin':'round','pointer-events':'none'},parent);
+  const icon=svg('g',{transform:'translate(-8.4 -32.4) scale(.7)',fill:'none',stroke:'currentColor','stroke-width':2,'stroke-linecap':'round','stroke-linejoin':'round','pointer-events':'none'},parent);
   const shape=d=>svg('path',{d},icon);
   if(type==='school'){
     shape('M2 9 12 4 22 9 12 14 2 9Z');
@@ -36,6 +36,22 @@ function drawIcon(parent,type){
   }
 }
 
+function paintPins(){
+  const dark=document.documentElement.dataset.theme==='dark';
+  for(const pin of document.querySelectorAll('#places-layer .place-pin')){
+    const color=dark?(darkDiscColors[pin.dataset.type]||'#b3c7dd'):pin.dataset.lightColor;
+    const shell=pin.querySelector('.place-pin-shape');
+    const disc=pin.querySelector('.place-pin-disc');
+    const icon=pin.querySelector('.place-pin-icon');
+    if(shell){
+      shell.setAttribute('fill',dark?'#8290a7':'#fff');
+      shell.setAttribute('stroke',dark?'#94a0b5':'#e6eaf0');
+    }
+    if(disc)disc.setAttribute('fill',color);
+    if(icon)icon.style.color=dark?'#182631':'#fff';
+  }
+}
+
 function renderPins(){
   const layer=document.getElementById('places-layer');
   if(!layer)return false;
@@ -44,7 +60,6 @@ function renderPins(){
     const type=typeById.get(place.dataset.place);
     if(!type)continue;
     const dot=place.querySelector(':scope > .place-bubble');
-    // Parks already have a transparent center hit target rather than a graph dot.
     const parkAnchor=type==='park'?place.querySelector(':scope > circle[fill="transparent"]'):null;
     const anchor=dot||parkAnchor;
     if(!anchor)continue;
@@ -52,21 +67,25 @@ function renderPins(){
     const cy=Number(anchor.getAttribute('cy'));
     const color=dot?.getAttribute('fill')||placeColors[type]||'#607a98';
     const oldGlyph=Array.from(place.children).find(node=>node.localName==='text'&&!node.classList.contains('place-label'));
-    const pin=svg('g',{class:'place-pin',transform:`translate(${cx} ${cy})`},place);
+    const pin=svg('g',{class:'place-pin','data-type':type,'data-light-color':color,transform:`translate(${cx} ${cy})`},place);
     const art=svg('g',{class:'place-pin-art'},pin);
-    svg('path',{d:'M0 0C-5 -8 -15 -17 -15 -24A15 15 0 1 1 15 -24C15 -17 5 -8 0 0Z',fill:color,stroke:'#fff','stroke-width':1.8,class:'place-pin-shape',style:'filter:drop-shadow(0 1px 1.5px #17243555)'},art);
-    svg('circle',{cx:0,cy:-24,r:10.5,fill:'#fff','pointer-events':'none'},art);
-    drawIcon(art,type);
+    svg('path',{d:'M0 0C-5 -8 -15 -17 -15 -24A15 15 0 1 1 15 -24C15 -17 5 -8 0 0Z',fill:'#fff',stroke:'#e6eaf0','stroke-width':1.8,class:'place-pin-shape',style:'filter:drop-shadow(0 1px 1.5px #17243555)'},art);
+    svg('circle',{cx:0,cy:-24,r:10.5,fill:color,class:'place-pin-disc','pointer-events':'none'},art);
+    const icon=svg('g',{class:'place-pin-icon',color:'#fff','pointer-events':'none'},art);
+    drawIcon(icon,type);
     const label=place.querySelector(':scope > .place-label');
     if(label)place.insertBefore(pin,label);
     dot?.remove();
     oldGlyph?.remove();
-    // Keep the park's transparent hit target so its original interaction remains.
+    // Parks retain their transparent hit targets, including their original clicks.
   }
+  paintPins();
   return true;
 }
 
-// map.js builds the city after its module runs; watch until its place layer exists.
+// The theme button changes data-theme without rebuilding the city.
+new MutationObserver(paintPins).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+// map.js creates the city synchronously after module imports finish.
 if(!renderPins()){
   const root=document.getElementById('map-world');
   if(root){
