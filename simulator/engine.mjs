@@ -239,7 +239,7 @@ export function simulate(config,options={}){
   target.infectiousStartDay=Math.max(day,target.onsetDay-(cfg.preSymptomaticDays??0));
   target.outcomeDay=target.onsetDay+cfg.infectiousDays;target.source=source;
   target.symptomatic=null;target.symptomOnsetProcessed=false;target.severe=false;target.severityAssessed=false;
-  target.hospitalRequestDay=null;target.admittedDay=null;target.careDenied=false;target.detected=false;
+  target.hospitalRequestDay=null;target.admittedDay=null;target.careDenied=false;target.careDeniedDays=0;target.detected=false;
   target.recoveredDay=null;target.immunityUntilDay=null;
   const actualPlace=place??target.home;
   const placeRegion=city.places.get(actualPlace)?.region??target.region;
