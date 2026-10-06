@@ -3,15 +3,15 @@
 
   const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
-  // Núcleo urbano central de Piracicaba.
-  // O enquadramento é intencionalmente urbano: não representa o limite municipal.
+  // Enquadramento do perímetro urbano de Piracicaba.
+  // É mais amplo que o centro, mas ainda evita mostrar o município rural inteiro.
   const CENTRAL_BOUNDS = [
-    [-47.6805, -22.7515],
-    [-47.6160, -22.6965]
+    [-47.7165, -22.7905],
+    [-47.5925, -22.6635]
   ];
 
   const CENTRAL_VIEW = {
-    center: [-47.6483, -22.7240],
+    center: [-47.6520, -22.7240],
     bearing2D: 0,
     bearing3D: -22,
     pitch2D: 0,
@@ -24,7 +24,7 @@
 
   let map = null;
   let is3D = false;
-  let minCentralZoom = 13;
+  let minCentralZoom = 11.5;
 
   const setStatus = (message) => {
     if (status) status.textContent = message;
@@ -124,7 +124,7 @@
       essential: true
     });
 
-    setStatus(active ? "Centro de Piracicaba · perspectiva 3D" : "Centro de Piracicaba · mapa plano");
+    setStatus(active ? "Piracicaba urbana · perspectiva 3D" : "Piracicaba urbana · mapa plano");
   }
 
   async function startMap() {
@@ -144,10 +144,10 @@
       container: "map",
       style: STYLE_URL,
       center: CENTRAL_VIEW.center,
-      zoom: 13.8,
+      zoom: 12.3,
       pitch: 0,
       bearing: 0,
-      minZoom: 13,
+      minZoom: 11.5,
       maxZoom: 19,
       maxPitch: 64,
       antialias: true,
@@ -173,7 +173,7 @@
     map.on("load", () => {
       lightenRoads();
       fitCentralView(false);
-      setStatus("Centro de Piracicaba · mapa plano");
+      setStatus("Piracicaba urbana · mapa plano");
     });
 
     map.on("error", (event) => {
@@ -188,8 +188,8 @@
       fitCentralView(true);
       setStatus(
         is3D
-          ? "Centro de Piracicaba · perspectiva 3D"
-          : "Centro de Piracicaba · mapa plano"
+          ? "Piracicaba urbana · perspectiva 3D"
+          : "Piracicaba urbana · mapa plano"
       );
     });
 
