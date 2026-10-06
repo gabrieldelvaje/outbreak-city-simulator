@@ -38,7 +38,7 @@
 
   const PREFEITURA_LAYER = "prefeitura-piracicaba-3d";
   const PREFEITURA_MODEL_URL = "./models/prefeitura-piracicaba.glb";
-  const PREFEITURA_ORIGIN = [-47.66432, -22.72902];
+  const PREFEITURA_ORIGIN = [-47.66462, -22.72833];
   const PREFEITURA_ALTITUDE = 0.8;
   const PREFEITURA_ROTATION_Y = -8 * Math.PI / 180;
   const PREFEITURA_LABEL_SOURCE = "prefeitura-label-source";
@@ -547,65 +547,25 @@
   }
 
   function excludeGenericPrefeituraBuilding() {
-    if (!map?.getSource(BUILDING_SOURCE) || !map.getLayer(BUILDING_LAYER)) return;
+    if (!map?.getLayer(BUILDING_LAYER)) return;
 
     try {
-      const features = map.querySourceFeatures(BUILDING_SOURCE, {
-        sourceLayer: "building"
-      });
+      const point = map.project(PREFEITURA_ORIGIN);
 
-      let nearest = null;
+      const features = map.queryRenderedFeatures(
+        [
+          [point.x - 4, point.y - 4],
+          [point.x + 4, point.y + 4]
+        ],
+        { layers: [BUILDING_LAYER] }
+      );
 
-      for (const feature of features) {
-        const coords = feature?.geometry?.coordinates;
-        if (!coords) continue;
+      if (!features.length) return;
 
-        let west = Infinity;
-        let east = -Infinity;
-        let south = Infinity;
-        let north = -Infinity;
+      const feature = features[0];
+      const targetId = feature.properties?.id ?? feature.id;
 
-        const walk = (value) => {
-          if (!Array.isArray(value)) return;
-
-          if (
-            value.length >= 2 &&
-            typeof value[0] === "number" &&
-            typeof value[1] === "number"
-          ) {
-            west = Math.min(west, value[0]);
-            east = Math.max(east, value[0]);
-            south = Math.min(south, value[1]);
-            north = Math.max(north, value[1]);
-            return;
-          }
-
-          value.forEach(walk);
-        };
-
-        walk(coords);
-
-        if (![west, east, south, north].every(Number.isFinite)) continue;
-
-        const lng = (west + east) / 2;
-        const lat = (south + north) / 2;
-        const dx = (lng - PREFEITURA_ORIGIN[0]) * 102700;
-        const dy = (lat - PREFEITURA_ORIGIN[1]) * 111320;
-        const distance = Math.hypot(dx, dy);
-
-        const id = feature.id ?? feature.properties?.id;
-
-        if (
-          distance < 110 &&
-          id !== undefined &&
-          id !== null &&
-          (!nearest || distance < nearest.distance)
-        ) {
-          nearest = { id, distance };
-        }
-      }
-
-      if (!nearest) return;
+      if (targetId === undefined || targetId === null) return;
 
       const baseFilter = [
         "any",
@@ -618,12 +578,15 @@
         baseFilter,
         [
           "!=",
-          ["coalesce", ["id"], ["get", "id"], ""],
-          nearest.id
+          [
+            "to-string",
+            ["coalesce", ["get", "id"], ["id"], ""]
+          ],
+          String(targetId)
         ]
       ]);
     } catch (error) {
-      console.debug("Prédio genérico da Prefeitura mantido.", error);
+      console.debug("Não foi possível ocultar apenas o footprint da Prefeitura.", error);
     }
   }
 
@@ -1030,8 +993,6 @@
       if (!map.getLayer(PREFEITURA_LAYER)) {
         map.addLayer(prefeituraLayer);
       }
-
-      map.once("idle", excludeGenericPrefeituraBuilding);
 
       // Os rótulos customizados ficam acima dos modelos e sempre de frente.
       if (map.getLayer(BRIDGE_LABEL_LAYER)) {
