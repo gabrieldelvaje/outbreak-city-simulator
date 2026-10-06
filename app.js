@@ -36,7 +36,7 @@
 
   const PREFEITURA_LAYER = "prefeitura-piracicaba-3d";
   const PREFEITURA_MODEL_URL = "./models/prefeitura-piracicaba.glb";
-  const PREFEITURA_ORIGIN = [-47.6633979, -22.7279405];
+  const PREFEITURA_ORIGIN = [-47.66572, -22.72868];
   const PREFEITURA_ALTITUDE = 0.8;
   const PREFEITURA_ROTATION_Y = -8 * Math.PI / 180;
   const PREFEITURA_LABEL_SOURCE = "prefeitura-label-source";
@@ -546,14 +546,20 @@
         sourceLayer: "building"
       });
 
-      const ids = [];
+      let nearest = null;
+
       for (const feature of features) {
         const coords = feature?.geometry?.coordinates;
         if (!coords) continue;
 
-        let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
+        let west = Infinity;
+        let east = -Infinity;
+        let south = Infinity;
+        let north = -Infinity;
+
         const walk = (value) => {
           if (!Array.isArray(value)) return;
+
           if (
             value.length >= 2 &&
             typeof value[0] === "number" &&
@@ -565,8 +571,10 @@
             north = Math.max(north, value[1]);
             return;
           }
+
           value.forEach(walk);
         };
+
         walk(coords);
 
         if (![west, east, south, north].every(Number.isFinite)) continue;
@@ -578,10 +586,18 @@
         const distance = Math.hypot(dx, dy);
 
         const id = feature.id ?? feature.properties?.id;
-        if (distance < 70 && id !== undefined && id !== null) ids.push(id);
+
+        if (
+          distance < 110 &&
+          id !== undefined &&
+          id !== null &&
+          (!nearest || distance < nearest.distance)
+        ) {
+          nearest = { id, distance };
+        }
       }
 
-      if (!ids.length) return;
+      if (!nearest) return;
 
       const baseFilter = [
         "any",
@@ -593,12 +609,9 @@
         "all",
         baseFilter,
         [
-          "!",
-          [
-            "in",
-            ["coalesce", ["id"], ["get", "id"], ""],
-            ["literal", [...new Set(ids)]]
-          ]
+          "!=",
+          ["coalesce", ["id"], ["get", "id"], ""],
+          nearest.id
         ]
       ]);
     } catch (error) {
