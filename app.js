@@ -27,6 +27,16 @@
   const BRIDGE_ORIGIN = [-47.6546194, -22.7182833];
   const BRIDGE_ALTITUDE = 2;
   const BRIDGE_ROTATION_Y = -18 * Math.PI / 180;
+  const BRIDGE_MASK_SOURCE = "ponte-pensil-mask-source";
+  const BRIDGE_MASK_LAYER = "ponte-pensil-native-mask";
+  const BRIDGE_LABEL_SOURCE = "ponte-pensil-label-source";
+  const BRIDGE_LABEL_LAYER = "ponte-pensil-label-3d";
+
+  // Aproximação do eixo da travessia, limitada à parte sobre o rio.
+  const BRIDGE_MASK_COORDS = [
+    [-47.655027, -22.718161],
+    [-47.654212, -22.718406]
+  ];
 
   const status = document.getElementById("map-status");
   const viewToggle = document.getElementById("view-toggle");
@@ -137,6 +147,187 @@
         layer.layout &&
         layer.layout["text-field"]
     )?.id;
+  }
+
+  function waterMaskColor() {
+    const layers = map.getStyle()?.layers || [];
+    const water = layers.find(
+      (layer) =>
+        layer.type === "fill" &&
+        /water/.test((layer.id || "").toLowerCase())
+    );
+
+    if (water) {
+      try {
+        const value = map.getPaintProperty(water.id, "fill-color");
+        if (typeof value === "string") return value;
+      } catch (_) {}
+    }
+
+    return "#8fb0ee";
+  }
+
+  function hideNativeBridgeLabel() {
+    const layers = map.getStyle()?.layers || [];
+
+    layers.forEach((layer) => {
+      if (layer.type !== "symbol") return;
+
+      const sourceLayer = (layer["source-layer"] || "").toLowerCase();
+      const id = (layer.id || "").toLowerCase();
+
+      if (
+        !/transportation|road|bridge|path|label/.test(sourceLayer + " " + id)
+      ) return;
+
+      try {
+        const current = map.getFilter(layer.id);
+        const excludeBridge = [
+          "!",
+          [
+            "in",
+            ["downcase", ["coalesce", ["get", "name"], ""]],
+            ["literal", ["ponte pênsil", "ponte pensil"]]
+          ]
+        ];
+
+        map.setFilter(
+          layer.id,
+          current ? ["all", current, excludeBridge] : excludeBridge
+        );
+      } catch (_) {}
+    });
+  }
+
+  function addBridgeMaskAndLabel() {
+    if (!map.getSource(BRIDGE_MASK_SOURCE)) {
+      map.addSource(BRIDGE_MASK_SOURCE, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: BRIDGE_MASK_COORDS
+          }
+        }
+      });
+    }
+
+    if (!map.getLayer(BRIDGE_MASK_LAYER)) {
+      map.addLayer({
+        id: BRIDGE_MASK_LAYER,
+        type: "line",
+        source: BRIDGE_MASK_SOURCE,
+        minzoom: 12.25,
+        paint: {
+          "line-color": waterMaskColor(),
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            12.25,
+            2.5,
+            14,
+            5,
+            16,
+            9,
+            18,
+            15
+          ],
+          "line-opacity": 1,
+          "line-blur": 0.15
+        }
+      });
+    }
+
+    if (!map.getSource(BRIDGE_LABEL_SOURCE)) {
+      map.addSource(BRIDGE_LABEL_SOURCE, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {
+            name: "Ponte Pênsil · 3D"
+          },
+          geometry: {
+            type: "Point",
+            coordinates: BRIDGE_ORIGIN
+          }
+        }
+      });
+    }
+
+    if (!map.getLayer(BRIDGE_LABEL_LAYER)) {
+      const baseLabel = firstLabelLayerId();
+      let textFont;
+
+      if (baseLabel) {
+        try {
+          textFont = map.getLayoutProperty(baseLabel, "text-font");
+        } catch (_) {}
+      }
+
+      const layout = {
+        "text-field": ["get", "name"],
+        "text-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          12.35,
+          10,
+          14,
+          12.5,
+          16,
+          15,
+          18,
+          17
+        ],
+        "text-anchor": "bottom",
+        "text-offset": [0, -1.35],
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+        "text-pitch-alignment": "viewport",
+        "text-rotation-alignment": "viewport"
+      };
+
+      if (Array.isArray(textFont) && textFont.length) {
+        layout["text-font"] = textFont;
+      }
+
+      map.addLayer({
+        id: BRIDGE_LABEL_LAYER,
+        type: "symbol",
+        source: BRIDGE_LABEL_SOURCE,
+        minzoom: 12.35,
+        layout,
+        paint: {
+          "text-color": "#0736FE",
+          "text-halo-color": "rgba(243,243,241,0.96)",
+          "text-halo-width": 1.4,
+          "text-halo-blur": 0.25
+        }
+      });
+    }
+
+    updateBridgeLabelForViewport();
+  }
+
+  function updateBridgeLabelForViewport() {
+    if (!map?.getLayer(BRIDGE_LABEL_LAYER)) return;
+
+    const mobile = window.matchMedia("(max-width: 720px)").matches;
+
+    map.setLayoutProperty(
+      BRIDGE_LABEL_LAYER,
+      "text-offset",
+      mobile ? [0, -1.15] : [0, -1.6]
+    );
+
+    map.setLayoutProperty(
+      BRIDGE_LABEL_LAYER,
+      "text-max-width",
+      mobile ? 11 : 16
+    );
   }
 
   function addOvertureBuildings() {
@@ -416,8 +607,17 @@
       lightenRoads();
       hideBaseStyleExtrusions();
       addOvertureBuildings();
+      hideNativeBridgeLabel();
+      addBridgeMaskAndLabel();
+
       if (!map.getLayer(BRIDGE_LAYER)) {
-        map.addLayer(bridgeLayer, firstLabelLayerId());
+        // Sem beforeId: o modelo fica acima das camadas nativas e do traço mascarado.
+        map.addLayer(bridgeLayer);
+      }
+
+      // O rótulo customizado fica por último para permanecer legível sobre o 3D.
+      if (map.getLayer(BRIDGE_LABEL_LAYER)) {
+        map.moveLayer(BRIDGE_LABEL_LAYER);
       }
       fitCentralView(false);
       setStatus("Piracicaba urbana · mapa plano");
@@ -446,6 +646,7 @@
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(() => {
         map.resize();
+        updateBridgeLabelForViewport();
 
         const camera = map.cameraForBounds(CENTRAL_BOUNDS, {
           padding: getPadding(),
