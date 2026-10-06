@@ -29,13 +29,21 @@
   const BRIDGE_ROTATION_Y = -18 * Math.PI / 180;
   const BRIDGE_MASK_SOURCE = "ponte-pensil-mask-source";
   const BRIDGE_MASK_LAYER = "ponte-pensil-native-mask";
+  const BRIDGE_LAND_MASK_SOURCE = "ponte-pensil-land-mask-source";
+  const BRIDGE_LAND_MASK_LAYER = "ponte-pensil-land-mask";
   const BRIDGE_LABEL_SOURCE = "ponte-pensil-label-source";
   const BRIDGE_LABEL_LAYER = "ponte-pensil-label-3d";
 
-  // Aproximação do eixo da travessia, limitada à parte sobre o rio.
+  // Eixo aproximado da travessia. O primeiro trecho cobre a ponte nativa
+  // sobre a água; o segundo cobre a continuação que aparece sobre a margem.
   const BRIDGE_MASK_COORDS = [
-    [-47.655027, -22.718161],
-    [-47.654212, -22.718406]
+    [-47.655125, -22.718132],
+    [-47.654135, -22.718430]
+  ];
+
+  const BRIDGE_LAND_MASK_COORDS = [
+    [-47.654160, -22.718423],
+    [-47.653860, -22.718515]
   ];
 
   const status = document.getElementById("map-status");
@@ -167,6 +175,35 @@
     return "#8fb0ee";
   }
 
+  function landMaskColor() {
+    const layers = map.getStyle()?.layers || [];
+
+    const background = layers.find((layer) => layer.type === "background");
+    if (background) {
+      try {
+        const value = map.getPaintProperty(background.id, "background-color");
+        if (typeof value === "string") return value;
+      } catch (_) {}
+    }
+
+    const land = layers.find(
+      (layer) =>
+        layer.type === "fill" &&
+        /(land|landuse|landcover|background)/.test(
+          (layer.id || "").toLowerCase()
+        )
+    );
+
+    if (land) {
+      try {
+        const value = map.getPaintProperty(land.id, "fill-color");
+        if (typeof value === "string") return value;
+      } catch (_) {}
+    }
+
+    return "#efeee9";
+  }
+
   function hideNativeBridgeLabel() {
     const layers = map.getStyle()?.layers || [];
 
@@ -227,16 +264,59 @@
             ["linear"],
             ["zoom"],
             12.25,
-            2.5,
+            3.2,
             14,
-            5,
+            6,
             16,
-            9,
+            12,
             18,
-            15
+            22
           ],
           "line-opacity": 1,
-          "line-blur": 0.15
+          "line-blur": 0.12,
+          "line-cap": "round"
+        }
+      });
+    }
+
+    if (!map.getSource(BRIDGE_LAND_MASK_SOURCE)) {
+      map.addSource(BRIDGE_LAND_MASK_SOURCE, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: BRIDGE_LAND_MASK_COORDS
+          }
+        }
+      });
+    }
+
+    if (!map.getLayer(BRIDGE_LAND_MASK_LAYER)) {
+      map.addLayer({
+        id: BRIDGE_LAND_MASK_LAYER,
+        type: "line",
+        source: BRIDGE_LAND_MASK_SOURCE,
+        minzoom: 12.25,
+        paint: {
+          "line-color": landMaskColor(),
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            12.25,
+            3.2,
+            14,
+            6,
+            16,
+            12,
+            18,
+            22
+          ],
+          "line-opacity": 1,
+          "line-blur": 0.12,
+          "line-cap": "round"
         }
       });
     }
