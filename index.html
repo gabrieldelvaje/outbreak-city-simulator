@@ -7,7 +7,8 @@
   <meta name="description" content="Piracicaba 3D — uma base cartográfica interativa para explorar a cidade e, nas próximas versões, seu patrimônio histórico." />
   <title>Piracicaba 3D</title>
   <link rel="preconnect" href="https://tiles.openfreemap.org" />
-  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.css" />
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.12.0/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -54,7 +55,6 @@
     <noscript>Este mapa precisa de JavaScript para funcionar.</noscript>
   </div>
 
-  <script src="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.js"></script>
-  <script src="./app.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
