@@ -247,7 +247,7 @@
         data: {
           type: "Feature",
           properties: {
-            name: "Ponte Pênsil · 3D"
+            name: "Ponte Pênsil"
           },
           geometry: {
             type: "Point",
@@ -282,12 +282,13 @@
           18,
           17
         ],
-        "text-anchor": "bottom",
-        "text-offset": [0, -1.35],
+        "text-anchor": "center",
+        "text-offset": [0, -1.15],
         "text-allow-overlap": true,
         "text-ignore-placement": true,
         "text-pitch-alignment": "viewport",
-        "text-rotation-alignment": "viewport"
+        "text-rotation-alignment": "viewport",
+        "text-keep-upright": true
       };
 
       if (Array.isArray(textFont) && textFont.length) {
@@ -320,7 +321,7 @@
     map.setLayoutProperty(
       BRIDGE_LABEL_LAYER,
       "text-offset",
-      mobile ? [0, -1.15] : [0, -1.6]
+      mobile ? [0, -1.05] : [0, -1.25]
     );
 
     map.setLayoutProperty(
