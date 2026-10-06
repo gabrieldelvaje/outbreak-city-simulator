@@ -1,138 +1,60 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f3f5f3">
-  <meta name="description" content="OUTBREAK: gerencie um ano de epidemia em uma cidade fictícia.">
-  <title>OUTBREAK | City Network Simulator</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦠</text></svg>">
-  <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="./city-reference.css">
-  <link rel="stylesheet" href="./theme.css">
-  <link rel="stylesheet" href="./game.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#f3f3f1" />
+  <meta name="description" content="Piracicaba 3D — uma base cartográfica interativa para explorar a cidade e, nas próximas versões, seu patrimônio histórico." />
+  <title>Piracicaba 3D</title>
+  <link rel="preconnect" href="https://tiles.openfreemap.org" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.css" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <div class="app">
+  <div class="app-shell">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><strong>OUTBREAK</strong><small>CITY NETWORK SIMULATOR <span class="alpha">JOGO · V0.8</span></small></div></div>
-      <div class="top-actions"><span class="status-dot" aria-hidden="true"></span><span class="status-label" id="game-status">Aguardando configuração</span><button class="ghost" id="reset-view" type="button">Centralizar mapa</button><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Ativar modo escuro" aria-pressed="false"><span class="theme-toggle__icon" aria-hidden="true">☾</span><span class="theme-toggle__label">Modo escuro</span></button></div>
+      <a class="brand" href="./" aria-label="Piracicaba 3D — início">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>PIRACICABA</span>
+        <span class="brand-slash">/</span>
+        <strong>3D</strong>
+      </a>
+      <div class="topbar-right">
+        <span class="version">V1</span>
+        <span id="map-status" class="status" role="status" aria-live="polite">Carregando mapa…</span>
+      </div>
     </header>
 
-    <main class="workspace">
-      <aside class="sidebar game-hud is-hidden" id="game-sidebar" aria-label="Painel da epidemia">
-        <p class="eyebrow">CIDADE</p>
-        <h1 id="city-name-display">—</h1>
-        <div class="game-statusline"><strong id="game-day">Dia —</strong><strong id="game-wave">Onda —</strong></div>
-        <div class="game-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="359" aria-valuenow="0"><div class="game-progress" id="game-progress"></div></div>
-        <div class="game-buttons game-buttons--hud"><button id="game-play" type="button" disabled>Pausar</button><button id="game-reset" type="button">Reiniciar</button><button id="game-step" type="button" hidden disabled>+1 dia</button></div>
-        <select id="game-speed" hidden><option value="90" selected>rápido</option></select>
+    <main class="map-stage">
+      <div id="map" aria-label="Mapa tridimensional interativo de Piracicaba"></div>
 
-        <section class="game-card game-card--hud">
-          <h2>Indicadores</h2>
-          <div class="game-stats">
-            <div class="game-stat"><b id="game-active">—</b><small>Ativos</small></div>
-            <div class="game-stat"><b id="game-new">—</b><small>Novos/dia</small></div>
-            <div class="game-stat"><b id="game-hospitalized">—</b><small>Internados</small></div>
-            <div class="game-stat"><b id="game-beds">—</b><small>Leitos ocupados</small></div>
-            <div class="game-stat"><b id="game-deaths">—</b><small>Óbitos</small></div>
-            <div class="game-stat"><b id="game-unmet-deaths">—</b><small>Óbitos c/ falta de leito*</small></div>
-            <div class="game-stat"><b id="game-attack">—</b><small>Já infectados</small></div>
-            <div class="game-stat"><b id="game-regions">—</b><small>Bairros atingidos</small></div>
-            <div class="game-stat"><b id="game-reinfections">—</b><small>Reinfecções</small></div>
-          </div>
-          <p class="caveat">* Associação do modelo com dias sem atendimento, não atribuição causal individual.</p>
-        </section>
-
-        <section class="game-card game-card--hud">
-          <h2>Vacinação</h2>
-          <div class="dose-row"><span>1ª dose</span><b id="game-dose1">0</b></div>
-          <div class="dose-row"><span>2ª dose</span><b id="game-dose2">0</b></div>
-          <div class="dose-row"><span>3ª dose / reforço</span><b id="game-dose3">0</b></div>
-        </section>
-
-        <section class="game-card game-card--hud">
-          <h2>Vigilância</h2>
-          <div class="game-alert" id="game-alert"><span id="game-alert-text">O hospital ainda não detectou excesso de casos.</span></div>
-          <ul class="game-decision-log" id="game-decision-log"></ul>
-        </section>
-      </aside>
-
-      <section class="map-shell" aria-label="Mapa interativo da cidade fictícia">
-        <div class="map-viewport" id="map-viewport">
-          <svg id="city-map" viewBox="0 0 1600 900" role="img" aria-label="Cidade fictícia com um surto respiratório simulado" xmlns="http://www.w3.org/2000/svg"><g id="map-world"></g></svg>
-        </div>
-        <div class="zoom-controls" aria-label="Zoom do mapa"><button id="zoom-in" type="button" aria-label="Aproximar">+</button><button id="zoom-out" type="button" aria-label="Afastar">−</button><button id="zoom-reset" type="button" aria-label="Redefinir zoom">⌖</button></div>
-
-        <div class="game-toast" id="game-message" aria-live="polite">Configure sua cidade para começar.</div>
-
-        <div class="game-overlay is-open" id="setup-overlay">
-          <div class="game-modal game-modal--setup">
-            <p class="eyebrow">OUTBREAK / UM ANO DE EPIDEMIA</p>
-            <h2>Bem-vindo à sua cidade.</h2>
-            <p>Você vai acompanhar 360 dias de uma epidemia respiratória, distribuída em quatro ciclos de onda, tomando decisões conforme a pressão sobre a cidade e os hospitais aumenta.</p>
-            <label class="game-field"><span>Nome da cidade</span><input id="game-city-name" type="text" maxlength="28" value="Nova Aurora" autocomplete="off"></label>
-            <label class="game-field"><span>População</span><div class="game-field-row"><input id="game-population" type="range" min="10" max="20000" step="10" value="5000"><input id="game-population-number" type="number" min="10" max="20000" step="10" value="5000"></div></label>
-            <label class="game-field"><span>Vírus</span><select id="game-disease"><option value="influenza">Influenza</option><option value="covid19">COVID-19</option><option value="rsv">VSR</option></select></label>
-            <select id="game-transmissibility" hidden><option value="high" selected>Alta</option></select>
-            <button class="game-start" id="game-prepare" type="button">Distribuir população</button>
-            <small class="modal-note">A transmissibilidade do jogo é fixada em alta. Os parâmetros continuam identificados como cenários quando não são estimados diretamente pelas bases.</small>
-          </div>
-        </div>
-
-        <div class="epicenter-prompt" id="epicenter-overlay" hidden>
-          <div>
-            <strong>Escolha o epicentro</strong>
-            <span id="game-focus">Clique em uma residência ou local público e escolha uma pessoa no grafo.</span>
-          </div>
-          <button class="game-start" id="game-start" type="button" disabled>Iniciar surto</button>
-        </div>
-
-        <div class="game-overlay" id="decision-overlay" hidden>
-          <div class="game-modal game-modal--decision">
-            <p class="eyebrow">SALA DE CRISE</p>
-            <h2 id="decision-title">Nova decisão</h2>
-            <p id="decision-message"></p>
-            <div class="game-decision-grid" id="game-decisions">
-              <button type="button" data-action="school">Fechar escolas</button>
-              <button type="button" data-action="remote">Home office</button>
-              <button type="button" data-action="leisure">Fechar lazer</button>
-              <button type="button" data-action="retail">Restringir comércio</button>
-              <button type="button" data-action="lockdown">Lockdown</button>
-              <button type="button" data-action="beds">Ampliar leitos</button>
-              <button type="button" data-action="vaccine1">Iniciar 1ª dose</button>
-              <button type="button" data-action="vaccine2">Aplicar 2ª dose</button>
-              <button type="button" data-action="vaccine3">Aplicar 3ª dose</button>
-              <button type="button" data-action="none">Continuar sem ação</button>
-            </div>
-            <small class="modal-note">As opções mostradas dependem do momento da epidemia e das decisões já tomadas.</small>
-          </div>
-        </div>
-
-        <div class="game-overlay" id="final-report-overlay" hidden>
-          <div class="game-modal game-modal--report">
-            <p class="eyebrow">RELATÓRIO FINAL · 360 DIAS</p>
-            <h2 id="final-report-title">Como suas decisões mudaram o cenário?</h2>
-            <p id="final-report-summary">Calculando o cenário contrafactual sem nenhuma ação pública…</p>
-            <div class="report-comparison" id="final-report-comparison"></div>
-            <div class="report-decisions">
-              <strong>Decisões tomadas</strong>
-              <ul id="final-report-decisions"></ul>
-            </div>
-            <p class="modal-note">Comparação sintética com a mesma população, seed e paciente zero, retirando intervenções, ampliação de leitos e vacinação. Não representa eficácia causal observada no mundo real.</p>
-            <div class="report-actions"><button class="game-start" id="final-report-close" type="button">Voltar ao mapa</button><button class="game-prepare" id="final-report-restart" type="button">Nova partida</button></div>
-          </div>
-        </div>
-
-        <div class="inspector" id="inspector" hidden><div class="inspector-heading"><span id="inspector-type">LOCAL</span><button type="button" id="inspector-close" aria-label="Fechar painel">×</button></div><h2 id="inspector-title"></h2><p id="inspector-desc"></p><div id="inspector-content"></div></div>
+      <section class="map-caption" aria-label="Sobre esta versão">
+        <p class="eyebrow">BASE CARTOGRÁFICA · V1</p>
+        <h1>Piracicaba em volume.</h1>
+        <p>Uma primeira camada 3D da cidade. Patrimônio, fotografias históricas e marcos modelados individualmente entram nas próximas versões.</p>
       </section>
+
+      <div class="map-actions" aria-label="Controles de visualização">
+        <button id="view-toggle" class="action-button is-active" type="button" aria-pressed="true" title="Alternar visualização 3D">
+          <span class="action-icon" aria-hidden="true">◇</span>
+          <span>3D</span>
+        </button>
+        <button id="reset-view" class="action-button" type="button" title="Voltar para o centro de Piracicaba">
+          <span class="action-icon" aria-hidden="true">↗</span>
+          <span>Centro</span>
+        </button>
+      </div>
+
+      <div class="map-key">
+        <span><i class="key-swatch"></i> edifícios extrudados</span>
+        <span>MapLibre · OpenFreeMap · OpenStreetMap</span>
+      </div>
     </main>
-    <footer class="footer"><span>OUTBREAK / EXPERIMENTAL</span><span>Simulação sintética data-informed · Não é previsão epidemiológica real</span></footer>
+
+    <noscript>Este mapa precisa de JavaScript para funcionar.</noscript>
   </div>
-  <script type="module" src="./src/map.js"></script>
-  <script type="module" src="./src/cfg-additions.js"></script>
-  <script type="module" src="./src/place-pins.js"></script>
-  <script type="module" src="./src/theme.js"></script>
-  <script type="module" src="./src/game.js"></script>
+
+  <script src="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
