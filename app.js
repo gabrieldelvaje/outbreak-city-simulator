@@ -2,9 +2,10 @@
   "use strict";
 
   const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+  const OVERTURE_BUILDINGS =
+    "https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/2026-09-23.1/buildings.pmtiles";
 
   // Enquadramento do perímetro urbano de Piracicaba.
-  // É mais amplo que o centro, mas ainda evita mostrar o município rural inteiro.
   const CENTRAL_BOUNDS = [
     [-47.7165, -22.7905],
     [-47.5925, -22.6635]
@@ -18,6 +19,9 @@
     pitch3D: 58
   };
 
+  const BUILDING_SOURCE = "overture-buildings";
+  const BUILDING_LAYER = "overture-buildings-3d";
+
   const status = document.getElementById("map-status");
   const viewToggle = document.getElementById("view-toggle");
   const resetView = document.getElementById("reset-view");
@@ -25,6 +29,7 @@
   let map = null;
   let is3D = false;
   let minCentralZoom = 11.5;
+  let overtureReady = false;
 
   const setStatus = (message) => {
     if (status) status.textContent = message;
@@ -71,11 +76,8 @@
       essential: true
     };
 
-    if (animate) {
-      map.easeTo(target);
-    } else {
-      map.jumpTo(target);
-    }
+    if (animate) map.easeTo(target);
+    else map.jumpTo(target);
   }
 
   function lightenRoads() {
@@ -85,7 +87,6 @@
       if (layer.type !== "line") return;
 
       const id = (layer.id || "").toLowerCase();
-
       const isRoad =
         /(road|street|transportation|highway|motorway|trunk|primary|secondary|tertiary|minor|service)/.test(id) &&
         !/(rail|transit|ferry|water|boundary)/.test(id);
@@ -101,12 +102,116 @@
         );
 
         if (map.getPaintProperty(layer.id, "line-opacity") !== undefined) {
-          map.setPaintProperty(layer.id, "line-opacity", isCasing ? 0.78 : 0.96);
+          map.setPaintProperty(
+            layer.id,
+            "line-opacity",
+            isCasing ? 0.76 : 0.96
+          );
         }
-      } catch (error) {
-        console.debug("Camada viária mantida no estilo original:", layer.id);
-      }
+      } catch (_) {}
     });
+  }
+
+  function hideBaseStyleExtrusions() {
+    const layers = map.getStyle()?.layers || [];
+    layers.forEach((layer) => {
+      if (layer.type !== "fill-extrusion") return;
+      try {
+        map.setLayoutProperty(layer.id, "visibility", "none");
+      } catch (_) {}
+    });
+  }
+
+  function firstLabelLayerId() {
+    const layers = map.getStyle()?.layers || [];
+    return layers.find(
+      (layer) =>
+        layer.type === "symbol" &&
+        layer.layout &&
+        layer.layout["text-field"]
+    )?.id;
+  }
+
+  function addOvertureBuildings() {
+    if (!map || map.getSource(BUILDING_SOURCE)) {
+      overtureReady = Boolean(map?.getSource(BUILDING_SOURCE));
+      return;
+    }
+
+    try {
+      map.addSource(BUILDING_SOURCE, {
+        type: "vector",
+        url: `pmtiles://${OVERTURE_BUILDINGS}`,
+        attribution: "Buildings © Overture Maps Foundation"
+      });
+
+      const heightExpression = [
+        "case",
+        ["has", "height"],
+        ["max", ["to-number", ["get", "height"]], 3],
+        ["has", "num_floors"],
+        ["max", ["*", ["to-number", ["get", "num_floors"]], 3], 3],
+        5
+      ];
+
+      const baseExpression = [
+        "case",
+        ["has", "min_height"],
+        ["max", ["to-number", ["get", "min_height"]], 0],
+        0
+      ];
+
+      map.addLayer(
+        {
+          id: BUILDING_LAYER,
+          type: "fill-extrusion",
+          source: BUILDING_SOURCE,
+          "source-layer": "building",
+          minzoom: 11.5,
+          filter: [
+            "any",
+            ["!", ["has", "is_underground"]],
+            ["!=", ["get", "is_underground"], true]
+          ],
+          layout: {
+            visibility: "none"
+          },
+          paint: {
+            "fill-extrusion-color": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              11.5,
+              "#dcddd9",
+              15,
+              "#d0d2ce",
+              18,
+              "#c3c6c1"
+            ],
+            "fill-extrusion-height": heightExpression,
+            "fill-extrusion-base": baseExpression,
+            "fill-extrusion-opacity": 0.9,
+            "fill-extrusion-vertical-gradient": true
+          }
+        },
+        firstLabelLayerId()
+      );
+
+      overtureReady = true;
+    } catch (error) {
+      overtureReady = false;
+      console.warn("Não foi possível adicionar os edifícios do Overture.", error);
+    }
+  }
+
+  function setBuildingVisibility(active) {
+    if (!overtureReady || !map?.getLayer(BUILDING_LAYER)) return;
+
+    map.setLayoutProperty(
+      BUILDING_LAYER,
+      "visibility",
+      active ? "visible" : "none"
+    );
   }
 
   function set3D(active, animate = true) {
@@ -115,6 +220,7 @@
     is3D = active;
     viewToggle?.classList.toggle("is-active", active);
     viewToggle?.setAttribute("aria-pressed", String(active));
+    setBuildingVisibility(active);
 
     map.easeTo({
       pitch: active ? CENTRAL_VIEW.pitch3D : CENTRAL_VIEW.pitch2D,
@@ -124,18 +230,34 @@
       essential: true
     });
 
-    setStatus(active ? "Piracicaba urbana · perspectiva 3D" : "Piracicaba urbana · mapa plano");
+    if (active) {
+      setStatus(
+        overtureReady
+          ? "Piracicaba urbana · edifícios Overture"
+          : "Piracicaba urbana · perspectiva 3D"
+      );
+    } else {
+      setStatus("Piracicaba urbana · mapa plano");
+    }
   }
 
   async function startMap() {
     let maplibregl;
+    let Protocol;
 
     try {
-      maplibregl = await import(
-        "https://unpkg.com/maplibre-gl@6.12.0/dist/maplibre-gl.mjs"
-      );
+      const modules = await Promise.all([
+        import("https://unpkg.com/maplibre-gl@6.12.0/dist/maplibre-gl.mjs"),
+        import("https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm")
+      ]);
+
+      maplibregl = modules[0];
+      Protocol = modules[1].Protocol;
+
+      const protocol = new Protocol();
+      maplibregl.addProtocol("pmtiles", protocol.tile);
     } catch (error) {
-      console.error("Falha ao carregar MapLibre.", error);
+      console.error("Falha ao carregar o motor cartográfico.", error);
       setStatus("Não foi possível carregar o mapa.");
       return;
     }
@@ -165,13 +287,15 @@
     map.addControl(
       new maplibregl.AttributionControl({
         compact: true,
-        customAttribution: "Piracicaba · V1"
+        customAttribution: "Piracicaba · Overture · V1"
       }),
       "bottom-right"
     );
 
     map.on("load", () => {
       lightenRoads();
+      hideBaseStyleExtrusions();
+      addOvertureBuildings();
       fitCentralView(false);
       setStatus("Piracicaba urbana · mapa plano");
     });
@@ -186,9 +310,10 @@
 
     resetView?.addEventListener("click", () => {
       fitCentralView(true);
+      setBuildingVisibility(is3D);
       setStatus(
         is3D
-          ? "Piracicaba urbana · perspectiva 3D"
+          ? "Piracicaba urbana · edifícios Overture"
           : "Piracicaba urbana · mapa plano"
       );
     });
