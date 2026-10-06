@@ -12,7 +12,9 @@
   ];
 
   const CENTRAL_VIEW = {
-    center: [-47.6520, -22.7240],
+    center: [-47.6517, -22.7219],
+    zoomDesktop: 14.05,
+    zoomMobile: 13.75,
     bearing2D: 0,
     bearing3D: -22,
     pitch2D: 0,
@@ -87,22 +89,28 @@
   function fitCentralView(animate = false) {
     if (!map) return;
 
-    const camera = map.cameraForBounds(CENTRAL_BOUNDS, {
+    const boundsCamera = map.cameraForBounds(CENTRAL_BOUNDS, {
       padding: getPadding(),
       bearing: 0,
       pitch: 0
     });
 
-    if (!camera || !Number.isFinite(camera.zoom)) return;
+    if (!boundsCamera || !Number.isFinite(boundsCamera.zoom)) return;
 
-    // Permite afastar aproximadamente 1 nível além do enquadramento urbano.
-    minCentralZoom = Math.max(camera.zoom - 1, 10.25);
+    // Mantém a possibilidade de afastar para o perímetro urbano,
+    // mas a entrada padrão foca o eixo histórico central.
+    minCentralZoom = Math.max(boundsCamera.zoom - 1, 10.25);
     map.setMinZoom(minCentralZoom);
     map.setMaxBounds(expandBounds(CENTRAL_BOUNDS));
 
+    const mobile = window.matchMedia("(max-width: 720px)").matches;
+    const defaultZoom = mobile
+      ? CENTRAL_VIEW.zoomMobile
+      : CENTRAL_VIEW.zoomDesktop;
+
     const target = {
-      center: camera.center,
-      zoom: camera.zoom,
+      center: CENTRAL_VIEW.center,
+      zoom: Math.max(defaultZoom, minCentralZoom),
       pitch: is3D ? CENTRAL_VIEW.pitch3D : CENTRAL_VIEW.pitch2D,
       bearing: is3D ? CENTRAL_VIEW.bearing3D : CENTRAL_VIEW.bearing2D,
       duration: animate ? 850 : 0,
@@ -763,7 +771,9 @@
       container: "map",
       style: STYLE_URL,
       center: CENTRAL_VIEW.center,
-      zoom: 12.3,
+      zoom: window.matchMedia("(max-width: 720px)").matches
+        ? CENTRAL_VIEW.zoomMobile
+        : CENTRAL_VIEW.zoomDesktop,
       pitch: 0,
       bearing: 0,
       minZoom: 10.25,
