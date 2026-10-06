@@ -176,11 +176,6 @@
       setStatus("Centro de Piracicaba · mapa plano");
     });
 
-    map.on("styledata", () => {
-      // Mantém a paleta viária caso o estilo recalcule camadas.
-      if (map?.isStyleLoaded()) lightenRoads();
-    });
-
     map.on("error", (event) => {
       if (event?.error) console.warn(event.error);
     });
