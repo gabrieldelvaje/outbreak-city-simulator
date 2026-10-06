@@ -656,15 +656,15 @@
               ["linear"],
               ["zoom"],
               11.5,
-              "#dcddd9",
+              "#f0f1ed",
               15,
-              "#d0d2ce",
+              "#e9eae6",
               18,
-              "#c3c6c1"
+              "#e2e4e0"
             ],
             "fill-extrusion-height": heightExpression,
             "fill-extrusion-base": baseExpression,
-            "fill-extrusion-opacity": 0.9,
+            "fill-extrusion-opacity": 0.84,
             "fill-extrusion-vertical-gradient": true
           }
         },
