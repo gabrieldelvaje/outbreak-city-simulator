@@ -2,21 +2,29 @@
   "use strict";
 
   const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
-  const IBGE_GEOJSON =
-    "https://servicodados.ibge.gov.br/api/v3/malhas/municipios/3538709?formato=application/vnd.geo+json&qualidade=minima";
 
-  // Limites aproximados do município, derivados do mapa municipal do IBGE.
-  // São usados como fallback caso a API de malhas esteja temporariamente indisponível.
-  const FALLBACK_BOUNDS = [
-    [-48.039161, -22.843797],
-    [-47.479264, -22.507858]
+  // Núcleo urbano central de Piracicaba.
+  // O enquadramento é intencionalmente urbano: não representa o limite municipal.
+  const CENTRAL_BOUNDS = [
+    [-47.6805, -22.7515],
+    [-47.6160, -22.6965]
   ];
 
+  const CENTRAL_VIEW = {
+    center: [-47.6483, -22.7240],
+    bearing2D: 0,
+    bearing3D: -22,
+    pitch2D: 0,
+    pitch3D: 58
+  };
+
   const status = document.getElementById("map-status");
+  const viewToggle = document.getElementById("view-toggle");
   const resetView = document.getElementById("reset-view");
 
   let map = null;
-  let piracicabaBounds = FALLBACK_BOUNDS;
+  let is3D = false;
+  let minCentralZoom = 13;
 
   const setStatus = (message) => {
     if (status) status.textContent = message;
@@ -24,11 +32,11 @@
 
   function getPadding() {
     return window.matchMedia("(max-width: 720px)").matches
-      ? { top: 95, right: 24, bottom: 72, left: 24 }
-      : { top: 88, right: 52, bottom: 52, left: 52 };
+      ? { top: 82, right: 24, bottom: 70, left: 24 }
+      : { top: 70, right: 54, bottom: 50, left: 54 };
   }
 
-  function expandBounds(bounds, factor = 0.015) {
+  function expandBounds(bounds, factor = 0.10) {
     const [[west, south], [east, north]] = bounds;
     const dx = (east - west) * factor;
     const dy = (north - south) * factor;
@@ -39,79 +47,27 @@
     ];
   }
 
-  function boundsFromGeoJSON(geojson) {
-    let west = Infinity;
-    let south = Infinity;
-    let east = -Infinity;
-    let north = -Infinity;
-
-    const walk = (coords) => {
-      if (!Array.isArray(coords)) return;
-
-      if (
-        coords.length >= 2 &&
-        typeof coords[0] === "number" &&
-        typeof coords[1] === "number"
-      ) {
-        const [lng, lat] = coords;
-        west = Math.min(west, lng);
-        south = Math.min(south, lat);
-        east = Math.max(east, lng);
-        north = Math.max(north, lat);
-        return;
-      }
-
-      coords.forEach(walk);
-    };
-
-    const geometries = [];
-
-    if (geojson?.type === "FeatureCollection") {
-      geojson.features?.forEach((feature) => {
-        if (feature?.geometry) geometries.push(feature.geometry);
-      });
-    } else if (geojson?.type === "Feature") {
-      if (geojson.geometry) geometries.push(geojson.geometry);
-    } else if (geojson?.coordinates) {
-      geometries.push(geojson);
-    }
-
-    geometries.forEach((geometry) => walk(geometry.coordinates));
-
-    if (![west, south, east, north].every(Number.isFinite)) {
-      return FALLBACK_BOUNDS;
-    }
-
-    return [
-      [west, south],
-      [east, north]
-    ];
-  }
-
-  function applyLockedView(animate = false) {
+  function fitCentralView(animate = false) {
     if (!map) return;
 
-    const padding = getPadding();
-    const camera = map.cameraForBounds(piracicabaBounds, {
-      padding,
+    const camera = map.cameraForBounds(CENTRAL_BOUNDS, {
+      padding: getPadding(),
       bearing: 0,
       pitch: 0
     });
 
     if (!camera || !Number.isFinite(camera.zoom)) return;
 
-    // Impede afastar mais do que o necessário para ver Piracicaba inteira.
-    map.setMinZoom(camera.zoom);
-
-    // Impede arrastar o mapa para fora da área do município.
-    map.setMaxBounds(expandBounds(piracicabaBounds));
+    minCentralZoom = camera.zoom;
+    map.setMinZoom(minCentralZoom);
+    map.setMaxBounds(expandBounds(CENTRAL_BOUNDS));
 
     const target = {
       center: camera.center,
       zoom: camera.zoom,
-      bearing: 0,
-      pitch: 0,
-      duration: animate ? 650 : 0,
+      pitch: is3D ? CENTRAL_VIEW.pitch3D : CENTRAL_VIEW.pitch2D,
+      bearing: is3D ? CENTRAL_VIEW.bearing3D : CENTRAL_VIEW.bearing2D,
+      duration: animate ? 850 : 0,
       essential: true
     };
 
@@ -122,61 +78,53 @@
     }
   }
 
-  async function loadMunicipalBoundary() {
-    try {
-      const response = await fetch(IBGE_GEOJSON, {
-        headers: { Accept: "application/geo+json, application/json" }
-      });
+  function lightenRoads() {
+    const layers = map.getStyle()?.layers || [];
 
-      if (!response.ok) throw new Error(`IBGE: HTTP ${response.status}`);
+    layers.forEach((layer) => {
+      if (layer.type !== "line") return;
 
-      const geojson = await response.json();
-      piracicabaBounds = boundsFromGeoJSON(geojson);
+      const id = (layer.id || "").toLowerCase();
 
-      if (!map.getSource("piracicaba-boundary")) {
-        map.addSource("piracicaba-boundary", {
-          type: "geojson",
-          data: geojson
-        });
+      const isRoad =
+        /(road|street|transportation|highway|motorway|trunk|primary|secondary|tertiary|minor|service)/.test(id) &&
+        !/(rail|transit|ferry|water|boundary)/.test(id);
 
-        map.addLayer({
-          id: "piracicaba-boundary-fill",
-          type: "fill",
-          source: "piracicaba-boundary",
-          paint: {
-            "fill-color": "#0736FE",
-            "fill-opacity": 0.025
-          }
-        });
+      if (!isRoad) return;
 
-        map.addLayer({
-          id: "piracicaba-boundary-line",
-          type: "line",
-          source: "piracicaba-boundary",
-          paint: {
-            "line-color": "#0736FE",
-            "line-width": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              9,
-              1.2,
-              13,
-              2
-            ],
-            "line-opacity": 0.85
-          }
-        });
+      try {
+        const isCasing = /(casing|outline|border)/.test(id);
+        map.setPaintProperty(
+          layer.id,
+          "line-color",
+          isCasing ? "#dfe1de" : "#fafaf7"
+        );
+
+        if (map.getPaintProperty(layer.id, "line-opacity") !== undefined) {
+          map.setPaintProperty(layer.id, "line-opacity", isCasing ? 0.78 : 0.96);
+        }
+      } catch (error) {
+        console.debug("Camada viária mantida no estilo original:", layer.id);
       }
+    });
+  }
 
-      applyLockedView(false);
-      setStatus("Piracicaba · limite municipal IBGE");
-    } catch (error) {
-      console.warn("Não foi possível carregar a malha oficial do IBGE.", error);
-      piracicabaBounds = FALLBACK_BOUNDS;
-      applyLockedView(false);
-      setStatus("Piracicaba · limite municipal");
-    }
+  function set3D(active, animate = true) {
+    if (!map) return;
+
+    is3D = active;
+    viewToggle?.classList.toggle("is-active", active);
+    viewToggle?.setAttribute("aria-pressed", String(active));
+
+    map.easeTo({
+      pitch: active ? CENTRAL_VIEW.pitch3D : CENTRAL_VIEW.pitch2D,
+      bearing: active ? CENTRAL_VIEW.bearing3D : CENTRAL_VIEW.bearing2D,
+      duration: animate ? 950 : 0,
+      easing: (t) => 1 - Math.pow(1 - t, 3),
+      essential: true
+    });
+
+    setStatus(active ? "Centro de Piracicaba · perspectiva 3D" : "Centro de Piracicaba · mapa plano");
   }
 
   async function startMap() {
@@ -195,18 +143,16 @@
     map = new maplibregl.Map({
       container: "map",
       style: STYLE_URL,
-      center: [-47.66, -22.73],
-      zoom: 10.2,
+      center: CENTRAL_VIEW.center,
+      zoom: 13.8,
       pitch: 0,
       bearing: 0,
-      minZoom: 9,
+      minZoom: 13,
       maxZoom: 19,
+      maxPitch: 64,
       antialias: true,
       attributionControl: false
     });
-
-    map.dragRotate.disable();
-    map.touchZoomRotate.disableRotation();
 
     map.addControl(
       new maplibregl.NavigationControl({
@@ -224,17 +170,32 @@
       "bottom-right"
     );
 
-    map.on("load", async () => {
-      await loadMunicipalBoundary();
+    map.on("load", () => {
+      lightenRoads();
+      fitCentralView(false);
+      setStatus("Centro de Piracicaba · mapa plano");
+    });
+
+    map.on("styledata", () => {
+      // Mantém a paleta viária caso o estilo recalcule camadas.
+      if (map?.isStyleLoaded()) lightenRoads();
     });
 
     map.on("error", (event) => {
       if (event?.error) console.warn(event.error);
     });
 
+    viewToggle?.addEventListener("click", () => {
+      set3D(!is3D, true);
+    });
+
     resetView?.addEventListener("click", () => {
-      applyLockedView(true);
-      setStatus("Piracicaba · município enquadrado");
+      fitCentralView(true);
+      setStatus(
+        is3D
+          ? "Centro de Piracicaba · perspectiva 3D"
+          : "Centro de Piracicaba · mapa plano"
+      );
     });
 
     let resizeTimer = null;
@@ -242,10 +203,8 @@
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(() => {
         map.resize();
-        const oldCenter = map.getCenter();
-        const oldZoom = map.getZoom();
 
-        const camera = map.cameraForBounds(piracicabaBounds, {
+        const camera = map.cameraForBounds(CENTRAL_BOUNDS, {
           padding: getPadding(),
           bearing: 0,
           pitch: 0
@@ -253,17 +212,16 @@
 
         if (!camera || !Number.isFinite(camera.zoom)) return;
 
-        map.setMinZoom(camera.zoom);
+        minCentralZoom = camera.zoom;
+        map.setMinZoom(minCentralZoom);
 
-        if (oldZoom < camera.zoom) {
+        if (map.getZoom() < minCentralZoom) {
           map.jumpTo({
             center: camera.center,
-            zoom: camera.zoom,
-            pitch: 0,
-            bearing: 0
+            zoom: minCentralZoom,
+            pitch: is3D ? CENTRAL_VIEW.pitch3D : 0,
+            bearing: is3D ? CENTRAL_VIEW.bearing3D : 0
           });
-        } else {
-          map.setCenter(oldCenter);
         }
       }, 160);
     });
