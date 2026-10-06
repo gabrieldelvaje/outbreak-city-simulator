@@ -34,6 +34,14 @@
   const BRIDGE_LABEL_SOURCE = "ponte-pensil-label-source";
   const BRIDGE_LABEL_LAYER = "ponte-pensil-label-3d";
 
+  const PREFEITURA_LAYER = "prefeitura-piracicaba-3d";
+  const PREFEITURA_MODEL_URL = "./models/prefeitura-piracicaba.glb";
+  const PREFEITURA_ORIGIN = [-47.6633979, -22.7281205];
+  const PREFEITURA_ALTITUDE = 0.8;
+  const PREFEITURA_ROTATION_Y = -8 * Math.PI / 180;
+  const PREFEITURA_LABEL_SOURCE = "prefeitura-label-source";
+  const PREFEITURA_LABEL_LAYER = "prefeitura-label-3d";
+
   // Eixo aproximado da travessia. O primeiro trecho cobre a ponte nativa
   // sobre a água; o segundo cobre a continuação que aparece sobre a margem.
   const BRIDGE_MASK_COORDS = [
@@ -236,6 +244,37 @@
     });
   }
 
+  function hideNativePrefeituraLabel() {
+    const layers = map.getStyle()?.layers || [];
+    const names = [
+      "prefeitura de piracicaba",
+      "prefeitura municipal de piracicaba",
+      "prefeitura do município de piracicaba",
+      "centro cívico cultural e educacional florivaldo coelho prates"
+    ];
+
+    layers.forEach((layer) => {
+      if (layer.type !== "symbol") return;
+
+      try {
+        const current = map.getFilter(layer.id);
+        const excludePrefeitura = [
+          "!",
+          [
+            "in",
+            ["downcase", ["coalesce", ["get", "name"], ""]],
+            ["literal", names]
+          ]
+        ];
+
+        map.setFilter(
+          layer.id,
+          current ? ["all", current, excludePrefeitura] : excludePrefeitura
+        );
+      } catch (_) {}
+    });
+  }
+
   function addBridgeMaskAndLabel() {
     if (!map.getSource(BRIDGE_MASK_SOURCE)) {
       map.addSource(BRIDGE_MASK_SOURCE, {
@@ -368,7 +407,9 @@
         "text-ignore-placement": true,
         "text-pitch-alignment": "viewport",
         "text-rotation-alignment": "viewport",
-        "text-keep-upright": true
+        "text-keep-upright": true,
+        "symbol-height-offset": 7,
+        "symbol-height-anchor": "ground"
       };
 
       if (Array.isArray(textFont) && textFont.length) {
@@ -382,7 +423,7 @@
         minzoom: 12.35,
         layout,
         paint: {
-          "text-color": "#0736FE",
+          "text-color": "#686865",
           "text-halo-color": "rgba(243,243,241,0.96)",
           "text-halo-width": 1.4,
           "text-halo-blur": 0.25
@@ -409,6 +450,153 @@
       "text-max-width",
       mobile ? 11 : 16
     );
+  }
+
+  function addPrefeituraLabel() {
+    if (!map.getSource(PREFEITURA_LABEL_SOURCE)) {
+      map.addSource(PREFEITURA_LABEL_SOURCE, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: { name: "Prefeitura de Piracicaba" },
+          geometry: {
+            type: "Point",
+            coordinates: PREFEITURA_ORIGIN
+          }
+        }
+      });
+    }
+
+    if (!map.getLayer(PREFEITURA_LABEL_LAYER)) {
+      const baseLabel = firstLabelLayerId();
+      let textFont;
+
+      if (baseLabel) {
+        try {
+          textFont = map.getLayoutProperty(baseLabel, "text-font");
+        } catch (_) {}
+      }
+
+      const layout = {
+        "text-field": ["get", "name"],
+        "text-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          12.0, 10,
+          14, 12.5,
+          16, 15,
+          18, 17
+        ],
+        "text-anchor": "bottom",
+        "text-offset": [0, -0.35],
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+        "text-pitch-alignment": "viewport",
+        "text-rotation-alignment": "viewport",
+        "text-keep-upright": true,
+        "symbol-height-offset": 58,
+        "symbol-height-anchor": "ground"
+      };
+
+      if (Array.isArray(textFont) && textFont.length) {
+        layout["text-font"] = textFont;
+      }
+
+      map.addLayer({
+        id: PREFEITURA_LABEL_LAYER,
+        type: "symbol",
+        source: PREFEITURA_LABEL_SOURCE,
+        minzoom: 12.0,
+        layout,
+        paint: {
+          "text-color": "#575754",
+          "text-halo-color": "rgba(243,243,241,0.97)",
+          "text-halo-width": 1.5,
+          "text-halo-blur": 0.25
+        }
+      });
+    }
+
+    updatePrefeituraLabelForViewport();
+  }
+
+  function updatePrefeituraLabelForViewport() {
+    if (!map?.getLayer(PREFEITURA_LABEL_LAYER)) return;
+    const mobile = window.matchMedia("(max-width: 720px)").matches;
+
+    map.setLayoutProperty(
+      PREFEITURA_LABEL_LAYER,
+      "text-max-width",
+      mobile ? 12 : 18
+    );
+
+    map.setLayoutProperty(
+      PREFEITURA_LABEL_LAYER,
+      "text-offset",
+      mobile ? [0, -0.2] : [0, -0.4]
+    );
+  }
+
+  function excludeGenericPrefeituraBuilding() {
+    if (!map?.getSource(BUILDING_SOURCE) || !map.getLayer(BUILDING_LAYER)) return;
+
+    try {
+      const features = map.querySourceFeatures(BUILDING_SOURCE, {
+        sourceLayer: "building"
+      });
+
+      const ids = [];
+      for (const feature of features) {
+        const coords = feature?.geometry?.coordinates;
+        if (!coords) continue;
+
+        let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
+        const walk = (value) => {
+          if (!Array.isArray(value)) return;
+          if (
+            value.length >= 2 &&
+            typeof value[0] === "number" &&
+            typeof value[1] === "number"
+          ) {
+            west = Math.min(west, value[0]);
+            east = Math.max(east, value[0]);
+            south = Math.min(south, value[1]);
+            north = Math.max(north, value[1]);
+            return;
+          }
+          value.forEach(walk);
+        };
+        walk(coords);
+
+        if (![west, east, south, north].every(Number.isFinite)) continue;
+
+        const lng = (west + east) / 2;
+        const lat = (south + north) / 2;
+        const dx = (lng - PREFEITURA_ORIGIN[0]) * 102700;
+        const dy = (lat - PREFEITURA_ORIGIN[1]) * 111320;
+        const distance = Math.hypot(dx, dy);
+
+        const id = feature.properties?.id;
+        if (distance < 75 && id) ids.push(id);
+      }
+
+      if (!ids.length) return;
+
+      const baseFilter = [
+        "any",
+        ["!", ["has", "is_underground"]],
+        ["!=", ["get", "is_underground"], true]
+      ];
+
+      map.setFilter(BUILDING_LAYER, [
+        "all",
+        baseFilter,
+        ["!", ["in", ["get", "id"], ["literal", [...new Set(ids)]]]]
+      ]);
+    } catch (error) {
+      console.debug("Prédio genérico da Prefeitura mantido.", error);
+    }
   }
 
   function addOvertureBuildings() {
@@ -684,21 +872,139 @@
       }
     };
 
+    const prefeituraMercator = maplibregl.MercatorCoordinate.fromLngLat(
+      PREFEITURA_ORIGIN,
+      PREFEITURA_ALTITUDE
+    );
+
+    const prefeituraTransform = {
+      translateX: prefeituraMercator.x,
+      translateY: prefeituraMercator.y,
+      translateZ: prefeituraMercator.z,
+      rotateX: Math.PI / 2,
+      rotateY: PREFEITURA_ROTATION_Y,
+      rotateZ: 0,
+      scale: prefeituraMercator.meterInMercatorCoordinateUnits()
+    };
+
+    const prefeituraLayer = {
+      id: PREFEITURA_LAYER,
+      type: "custom",
+      renderingMode: "3d",
+
+      onAdd(mapRef, gl) {
+        this.map = mapRef;
+        this.camera = new THREE.Camera();
+        this.scene = new THREE.Scene();
+
+        this.scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+
+        const key = new THREE.DirectionalLight(0xffffff, 2.5);
+        key.position.set(-35, -40, 90).normalize();
+        this.scene.add(key);
+
+        const fill = new THREE.DirectionalLight(0xe9edf5, 1.15);
+        fill.position.set(50, 25, 55).normalize();
+        this.scene.add(fill);
+
+        const loader = new GLTFLoader();
+        loader.load(
+          PREFEITURA_MODEL_URL,
+          (gltf) => {
+            gltf.scene.traverse((object) => {
+              if (!object.isMesh) return;
+              object.frustumCulled = false;
+              if (object.material) {
+                object.material.depthTest = true;
+                object.material.depthWrite = true;
+              }
+            });
+
+            this.scene.add(gltf.scene);
+            this.loaded = true;
+            this.map.triggerRepaint();
+          },
+          undefined,
+          (error) =>
+            console.warn("Não foi possível carregar a Prefeitura 3D.", error)
+        );
+
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: mapRef.getCanvas(),
+          context: gl,
+          antialias: true
+        });
+        this.renderer.autoClear = false;
+      },
+
+      render(gl, args) {
+        if (!this.loaded || this.map.getZoom() < 11.9) return;
+
+        const rx = new THREE.Matrix4().makeRotationAxis(
+          new THREE.Vector3(1, 0, 0),
+          prefeituraTransform.rotateX
+        );
+        const ry = new THREE.Matrix4().makeRotationAxis(
+          new THREE.Vector3(0, 1, 0),
+          prefeituraTransform.rotateY
+        );
+        const rz = new THREE.Matrix4().makeRotationAxis(
+          new THREE.Vector3(0, 0, 1),
+          prefeituraTransform.rotateZ
+        );
+
+        const projection = new THREE.Matrix4().fromArray(
+          args.defaultProjectionData.mainMatrix
+        );
+
+        const model = new THREE.Matrix4()
+          .makeTranslation(
+            prefeituraTransform.translateX,
+            prefeituraTransform.translateY,
+            prefeituraTransform.translateZ
+          )
+          .scale(
+            new THREE.Vector3(
+              prefeituraTransform.scale,
+              -prefeituraTransform.scale,
+              prefeituraTransform.scale
+            )
+          )
+          .multiply(rx)
+          .multiply(ry)
+          .multiply(rz);
+
+        this.camera.projectionMatrix = projection.multiply(model);
+        this.renderer.resetState();
+        this.renderer.render(this.scene, this.camera);
+      }
+    };
+
     map.on("load", () => {
       lightenRoads();
       hideBaseStyleExtrusions();
       addOvertureBuildings();
       hideNativeBridgeLabel();
+      hideNativePrefeituraLabel();
       addBridgeMaskAndLabel();
+      addPrefeituraLabel();
 
       if (!map.getLayer(BRIDGE_LAYER)) {
-        // Sem beforeId: o modelo fica acima das camadas nativas e do traço mascarado.
         map.addLayer(bridgeLayer);
       }
 
-      // O rótulo customizado fica por último para permanecer legível sobre o 3D.
+      if (!map.getLayer(PREFEITURA_LAYER)) {
+        map.addLayer(prefeituraLayer);
+      }
+
+      map.once("idle", excludeGenericPrefeituraBuilding);
+
+      // Os rótulos customizados ficam acima dos modelos e sempre de frente.
       if (map.getLayer(BRIDGE_LABEL_LAYER)) {
         map.moveLayer(BRIDGE_LABEL_LAYER);
+      }
+      if (map.getLayer(PREFEITURA_LABEL_LAYER)) {
+        map.moveLayer(PREFEITURA_LABEL_LAYER);
       }
       fitCentralView(false);
       setStatus("Piracicaba urbana · mapa plano");
@@ -728,6 +1034,7 @@
       resizeTimer = window.setTimeout(() => {
         map.resize();
         updateBridgeLabelForViewport();
+        updatePrefeituraLabelForViewport();
 
         const camera = map.cameraForBounds(CENTRAL_BOUNDS, {
           padding: getPadding(),
