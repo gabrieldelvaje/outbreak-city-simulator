@@ -10,6 +10,14 @@
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.12.0/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 <body>
   <div class="app-shell">
@@ -33,7 +41,7 @@
       <section class="map-caption" aria-label="Sobre esta versão">
         <p class="eyebrow">MAPA-BASE · V1</p>
         <h1>Piracicaba.</h1>
-        <p>Uma base cartográfica centrada no núcleo urbano. A perspectiva 3D inclina apenas o plano; os landmarks modelados individualmente entram nas próximas versões.</p>
+        <p>Uma base cartográfica do perímetro urbano com edifícios abertos e landmarks próprios. A Ponte Pênsil é o primeiro modelo 3D georreferenciado do projeto.</p>
       </section>
 
       <div class="map-actions" aria-label="Controles de visualização">
@@ -49,7 +57,7 @@
       </div>
 
       <div class="map-key">
-        <span>Centro de Piracicaba · navegação limitada ao núcleo urbano</span>
+        <span>Piracicaba urbana · Ponte Pênsil 3D</span>
         <span>MapLibre · OpenFreeMap · OpenStreetMap</span>
       </div>
     </main>

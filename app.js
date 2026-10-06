@@ -22,6 +22,12 @@
   const BUILDING_SOURCE = "overture-buildings";
   const BUILDING_LAYER = "overture-buildings-3d";
 
+  const BRIDGE_LAYER = "ponte-pensil-3d";
+  const BRIDGE_MODEL_URL = "./models/ponte_pensil_mapa.glb";
+  const BRIDGE_ORIGIN = [-47.6546194, -22.7182833];
+  const BRIDGE_ALTITUDE = 2;
+  const BRIDGE_ROTATION_Y = -Math.PI / 4;
+
   const status = document.getElementById("map-status");
   const viewToggle = document.getElementById("view-toggle");
   const resetView = document.getElementById("reset-view");
@@ -245,15 +251,21 @@
   async function startMap() {
     let maplibregl;
     let Protocol;
+    let THREE;
+    let GLTFLoader;
 
     try {
       const modules = await Promise.all([
         import("https://unpkg.com/maplibre-gl@6.12.0/dist/maplibre-gl.mjs"),
-        import("https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm")
+        import("https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm"),
+        import("three"),
+        import("three/addons/loaders/GLTFLoader.js")
       ]);
 
       maplibregl = modules[0];
       Protocol = modules[1].Protocol;
+      THREE = modules[2];
+      GLTFLoader = modules[3].GLTFLoader;
 
       const protocol = new Protocol();
       maplibregl.addProtocol("pmtiles", protocol.tile);
@@ -274,6 +286,7 @@
       maxZoom: 19,
       maxPitch: 64,
       antialias: true,
+      canvasContextAttributes: { antialias: true },
       attributionControl: false
     });
 
@@ -293,10 +306,119 @@
       "bottom-right"
     );
 
+    const bridgeMercator = maplibregl.MercatorCoordinate.fromLngLat(
+      BRIDGE_ORIGIN,
+      BRIDGE_ALTITUDE
+    );
+
+    const bridgeTransform = {
+      translateX: bridgeMercator.x,
+      translateY: bridgeMercator.y,
+      translateZ: bridgeMercator.z,
+      rotateX: Math.PI / 2,
+      rotateY: BRIDGE_ROTATION_Y,
+      rotateZ: 0,
+      scale: bridgeMercator.meterInMercatorCoordinateUnits()
+    };
+
+    const bridgeLayer = {
+      id: BRIDGE_LAYER,
+      type: "custom",
+      renderingMode: "3d",
+
+      onAdd(mapRef, gl) {
+        this.map = mapRef;
+        this.camera = new THREE.Camera();
+        this.scene = new THREE.Scene();
+
+        this.scene.add(new THREE.AmbientLight(0xffffff, 1.45));
+
+        const key = new THREE.DirectionalLight(0xffffff, 2.4);
+        key.position.set(-30, -45, 80).normalize();
+        this.scene.add(key);
+
+        const fill = new THREE.DirectionalLight(0xe8eefc, 1.1);
+        fill.position.set(45, 20, 55).normalize();
+        this.scene.add(fill);
+
+        const loader = new GLTFLoader();
+        loader.load(
+          BRIDGE_MODEL_URL,
+          (gltf) => {
+            gltf.scene.traverse((object) => {
+              if (!object.isMesh) return;
+              object.frustumCulled = false;
+              if (object.material) {
+                object.material.depthTest = true;
+                object.material.depthWrite = true;
+              }
+            });
+            this.scene.add(gltf.scene);
+            this.loaded = true;
+            this.map.triggerRepaint();
+          },
+          undefined,
+          (error) => console.warn("Não foi possível carregar a Ponte Pênsil 3D.", error)
+        );
+
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: mapRef.getCanvas(),
+          context: gl,
+          antialias: true
+        });
+        this.renderer.autoClear = false;
+      },
+
+      render(gl, args) {
+        if (!this.loaded || this.map.getZoom() < 12.35) return;
+
+        const rx = new THREE.Matrix4().makeRotationAxis(
+          new THREE.Vector3(1, 0, 0),
+          bridgeTransform.rotateX
+        );
+        const ry = new THREE.Matrix4().makeRotationAxis(
+          new THREE.Vector3(0, 1, 0),
+          bridgeTransform.rotateY
+        );
+        const rz = new THREE.Matrix4().makeRotationAxis(
+          new THREE.Vector3(0, 0, 1),
+          bridgeTransform.rotateZ
+        );
+
+        const projection = new THREE.Matrix4().fromArray(
+          args.defaultProjectionData.mainMatrix
+        );
+
+        const model = new THREE.Matrix4()
+          .makeTranslation(
+            bridgeTransform.translateX,
+            bridgeTransform.translateY,
+            bridgeTransform.translateZ
+          )
+          .scale(
+            new THREE.Vector3(
+              bridgeTransform.scale,
+              -bridgeTransform.scale,
+              bridgeTransform.scale
+            )
+          )
+          .multiply(rx)
+          .multiply(ry)
+          .multiply(rz);
+
+        this.camera.projectionMatrix = projection.multiply(model);
+        this.renderer.resetState();
+        this.renderer.render(this.scene, this.camera);
+      }
+    };
+
     map.on("load", () => {
       lightenRoads();
       hideBaseStyleExtrusions();
       addOvertureBuildings();
+      if (!map.getLayer(BRIDGE_LAYER)) {
+        map.addLayer(bridgeLayer, firstLabelLayerId());
+      }
       fitCentralView(false);
       setStatus("Piracicaba urbana · mapa plano");
     });
