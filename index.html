@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#f3f3f1" />
-  <meta name="description" content="Mapa-base interativo de Piracicaba, preparado para receber patrimônio, fotografias históricas e landmarks 3D personalizados." />
+  <meta name="description" content="Mapa-base interativo do centro de Piracicaba, preparado para receber patrimônio, fotografias históricas e landmarks 3D personalizados." />
   <title>Piracicaba 3D</title>
   <link rel="preconnect" href="https://tiles.openfreemap.org" />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
@@ -28,24 +28,29 @@
     </header>
 
     <main class="map-stage">
-      <div id="map" aria-label="Mapa interativo de Piracicaba"></div>
+      <div id="map" aria-label="Mapa interativo do centro de Piracicaba"></div>
 
       <section class="map-caption" aria-label="Sobre esta versão">
         <p class="eyebrow">MAPA-BASE · V1</p>
         <h1>Piracicaba.</h1>
-        <p>Primeira versão da base cartográfica. O mapa fica limitado ao município; patrimônio, fotos históricas e modelos 3D personalizados entram nas próximas etapas.</p>
+        <p>Uma base cartográfica centrada no núcleo urbano. A perspectiva 3D inclina apenas o plano; os landmarks modelados individualmente entram nas próximas versões.</p>
       </section>
 
       <div class="map-actions" aria-label="Controles de visualização">
-        <button id="reset-view" class="action-button" type="button" title="Enquadrar Piracicaba inteira">
-          <span class="action-icon" aria-hidden="true">⌖</span>
-          <span>Enquadrar</span>
+        <button id="view-toggle" class="action-button" type="button" aria-pressed="false" title="Alternar perspectiva 3D">
+          <span class="action-icon" aria-hidden="true">◇</span>
+          <span>3D</span>
+        </button>
+
+        <button id="reset-view" class="action-button" type="button" title="Voltar ao enquadramento central">
+          <span class="action-icon" aria-hidden="true">↗</span>
+          <span>Centro</span>
         </button>
       </div>
 
       <div class="map-key">
-        <span><i class="key-swatch boundary"></i> limite municipal</span>
-        <span>IBGE · MapLibre · OpenFreeMap · OpenStreetMap</span>
+        <span>Centro de Piracicaba · navegação limitada ao núcleo urbano</span>
+        <span>MapLibre · OpenFreeMap · OpenStreetMap</span>
       </div>
     </main>
 
