@@ -205,6 +205,9 @@
       attributionControl: false
     });
 
+    map.dragRotate.disable();
+    map.touchZoomRotate.disableRotation();
+
     map.addControl(
       new maplibregl.NavigationControl({
         showCompass: false,
