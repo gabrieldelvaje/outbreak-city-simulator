@@ -7,8 +7,8 @@
 
   // Enquadramento do perímetro urbano de Piracicaba.
   const CENTRAL_BOUNDS = [
-    [-47.7165, -22.7905],
-    [-47.5925, -22.6635]
+    [-47.7420, -22.8120],
+    [-47.5580, -22.6220]
   ];
 
   const CENTRAL_VIEW = {
@@ -41,7 +41,7 @@
       : { top: 70, right: 54, bottom: 50, left: 54 };
   }
 
-  function expandBounds(bounds, factor = 0.10) {
+  function expandBounds(bounds, factor = 0.32) {
     const [[west, south], [east, north]] = bounds;
     const dx = (east - west) * factor;
     const dy = (north - south) * factor;
@@ -63,7 +63,8 @@
 
     if (!camera || !Number.isFinite(camera.zoom)) return;
 
-    minCentralZoom = camera.zoom;
+    // Permite afastar aproximadamente 1 nível além do enquadramento urbano.
+    minCentralZoom = Math.max(camera.zoom - 1, 10.25);
     map.setMinZoom(minCentralZoom);
     map.setMaxBounds(expandBounds(CENTRAL_BOUNDS));
 
@@ -269,7 +270,7 @@
       zoom: 12.3,
       pitch: 0,
       bearing: 0,
-      minZoom: 11.5,
+      minZoom: 10.25,
       maxZoom: 19,
       maxPitch: 64,
       antialias: true,
@@ -332,7 +333,7 @@
 
         if (!camera || !Number.isFinite(camera.zoom)) return;
 
-        minCentralZoom = camera.zoom;
+        minCentralZoom = Math.max(camera.zoom - 1, 10.25);
         map.setMinZoom(minCentralZoom);
 
         if (map.getZoom() < minCentralZoom) {
