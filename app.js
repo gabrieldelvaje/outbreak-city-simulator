@@ -26,7 +26,7 @@
   const BRIDGE_MODEL_URL = "./models/ponte_pensil_mapa.glb";
   const BRIDGE_ORIGIN = [-47.6546194, -22.7182833];
   const BRIDGE_ALTITUDE = 2;
-  const BRIDGE_ROTATION_Y = -25 * Math.PI / 180;
+  const BRIDGE_ROTATION_Y = -18 * Math.PI / 180;
 
   const status = document.getElementById("map-status");
   const viewToggle = document.getElementById("view-toggle");
