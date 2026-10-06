@@ -36,7 +36,7 @@
 
   const PREFEITURA_LAYER = "prefeitura-piracicaba-3d";
   const PREFEITURA_MODEL_URL = "./models/prefeitura-piracicaba.glb";
-  const PREFEITURA_ORIGIN = [-47.6633979, -22.7281205];
+  const PREFEITURA_ORIGIN = [-47.6633979, -22.7279405];
   const PREFEITURA_ALTITUDE = 0.8;
   const PREFEITURA_ROTATION_Y = -8 * Math.PI / 180;
   const PREFEITURA_LABEL_SOURCE = "prefeitura-label-source";
@@ -577,8 +577,8 @@
         const dy = (lat - PREFEITURA_ORIGIN[1]) * 111320;
         const distance = Math.hypot(dx, dy);
 
-        const id = feature.properties?.id;
-        if (distance < 75 && id) ids.push(id);
+        const id = feature.id ?? feature.properties?.id;
+        if (distance < 70 && id !== undefined && id !== null) ids.push(id);
       }
 
       if (!ids.length) return;
@@ -592,7 +592,14 @@
       map.setFilter(BUILDING_LAYER, [
         "all",
         baseFilter,
-        ["!", ["in", ["get", "id"], ["literal", [...new Set(ids)]]]]
+        [
+          "!",
+          [
+            "in",
+            ["coalesce", ["id"], ["get", "id"], ""],
+            ["literal", [...new Set(ids)]]
+          ]
+        ]
       ]);
     } catch (error) {
       console.debug("Prédio genérico da Prefeitura mantido.", error);
@@ -679,6 +686,10 @@
       "visibility",
       active ? "visible" : "none"
     );
+
+    if (active) {
+      map.once("idle", excludeGenericPrefeituraBuilding);
+    }
   }
 
   function set3D(active, animate = true) {
