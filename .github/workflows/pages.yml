@@ -1,4 +1,4 @@
-name: Deploy Piracicaba 3D to Pages
+name: Deploy Piracicaba Transit Map to Pages
 
 on:
   push:
