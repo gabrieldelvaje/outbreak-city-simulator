@@ -38,7 +38,7 @@
 
   const PREFEITURA_LAYER = "prefeitura-piracicaba-3d";
   const PREFEITURA_MODEL_URL = "./models/prefeitura-piracicaba.glb";
-  const PREFEITURA_ORIGIN = [-47.66518, -22.72847];
+  const PREFEITURA_SEARCH_ORIGIN = [-47.66478, -22.72890];
   const PREFEITURA_ALTITUDE = 0.8;
   const PREFEITURA_ROTATION_Y = 10 * Math.PI / 180;
   const PREFEITURA_LABEL_SOURCE = "prefeitura-label-source";
@@ -64,6 +64,10 @@
   let is3D = false;
   let minCentralZoom = 11.5;
   let overtureReady = false;
+  let maplibreglRuntime = null;
+  let prefeituraOrigin = [...PREFEITURA_SEARCH_ORIGIN];
+  let prefeituraTransform = null;
+  let prefeituraTargetId = null;
 
   const setStatus = (message) => {
     if (status) status.textContent = message;
@@ -469,7 +473,7 @@
           properties: { name: "Prefeitura de Piracicaba" },
           geometry: {
             type: "Point",
-            coordinates: PREFEITURA_ORIGIN
+            coordinates: prefeituraOrigin
           }
         }
       });
@@ -546,47 +550,187 @@
     );
   }
 
-  function excludeGenericPrefeituraBuilding() {
+  function prefeituraBaseBuildingFilter() {
+    return [
+      "any",
+      ["!", ["has", "is_underground"]],
+      ["!=", ["get", "is_underground"], true]
+    ];
+  }
+
+  function updatePrefeituraLabelPosition() {
+    const source = map?.getSource(PREFEITURA_LABEL_SOURCE);
+    if (!source) return;
+
+    source.setData({
+      type: "Feature",
+      properties: { name: "Prefeitura de Piracicaba" },
+      geometry: {
+        type: "Point",
+        coordinates: prefeituraOrigin
+      }
+    });
+  }
+
+  function footprintStats(feature) {
+    const coordinates = feature?.geometry?.coordinates;
+    if (!Array.isArray(coordinates)) return null;
+
+    let west = Infinity;
+    let east = -Infinity;
+    let south = Infinity;
+    let north = -Infinity;
+
+    const walk = (value) => {
+      if (!Array.isArray(value)) return;
+
+      if (
+        value.length >= 2 &&
+        typeof value[0] === "number" &&
+        typeof value[1] === "number"
+      ) {
+        west = Math.min(west, value[0]);
+        east = Math.max(east, value[0]);
+        south = Math.min(south, value[1]);
+        north = Math.max(north, value[1]);
+        return;
+      }
+
+      value.forEach(walk);
+    };
+
+    walk(coordinates);
+
+    if (![west, east, south, north].every(Number.isFinite)) return null;
+
+    const center = [(west + east) / 2, (south + north) / 2];
+    const metersPerLon = 111320 * Math.cos((center[1] * Math.PI) / 180);
+    const width = Math.max((east - west) * metersPerLon, 0.1);
+    const height = Math.max((north - south) * 111320, 0.1);
+
+    const dx = (center[0] - PREFEITURA_SEARCH_ORIGIN[0]) * metersPerLon;
+    const dy = (center[1] - PREFEITURA_SEARCH_ORIGIN[1]) * 111320;
+    const distance = Math.hypot(dx, dy);
+
+    return {
+      center,
+      width,
+      height,
+      area: width * height,
+      distance
+    };
+  }
+
+  function applyPrefeituraBuildingFilter() {
     if (!map?.getLayer(BUILDING_LAYER)) return;
 
+    const baseFilter = prefeituraBaseBuildingFilter();
+
+    if (prefeituraTargetId === null) {
+      map.setFilter(BUILDING_LAYER, baseFilter);
+      return;
+    }
+
+    map.setFilter(BUILDING_LAYER, [
+      "all",
+      baseFilter,
+      [
+        "!=",
+        ["to-string", ["coalesce", ["get", "id"], ["id"], ""]],
+        String(prefeituraTargetId)
+      ]
+    ]);
+  }
+
+  function snapPrefeituraToFootprint() {
+    if (
+      !map ||
+      !maplibreglRuntime ||
+      !prefeituraTransform ||
+      !map.getLayer(BUILDING_LAYER)
+    ) return;
+
+    if (prefeituraTargetId !== null) {
+      applyPrefeituraBuildingFilter();
+      return;
+    }
+
     try {
-      const point = map.project(PREFEITURA_ORIGIN);
+      // Search around the marked civic-center block, then choose a substantial
+      // footprint close to that anchor instead of guessing coordinates.
+      const point = map.project(PREFEITURA_SEARCH_ORIGIN);
+      const radius = window.matchMedia("(max-width: 720px)").matches ? 72 : 58;
 
       const features = map.queryRenderedFeatures(
         [
-          [point.x - 4, point.y - 4],
-          [point.x + 4, point.y + 4]
+          [point.x - radius, point.y - radius],
+          [point.x + radius, point.y + radius]
         ],
         { layers: [BUILDING_LAYER] }
       );
 
-      if (!features.length) return;
+      const candidates = [];
+      const seen = new Set();
 
-      const feature = features[0];
-      const targetId = feature.properties?.id ?? feature.id;
+      for (const feature of features) {
+        const id = feature.properties?.id ?? feature.id;
+        if (id === undefined || id === null || seen.has(String(id))) continue;
+        seen.add(String(id));
 
-      if (targetId === undefined || targetId === null) return;
+        const stats = footprintStats(feature);
+        if (!stats) continue;
 
-      const baseFilter = [
-        "any",
-        ["!", ["has", "is_underground"]],
-        ["!=", ["get", "is_underground"], true]
-      ];
+        // The city-hall block is much larger than the small service buildings
+        // around it. Keep only plausible tower footprints.
+        if (stats.area < 350 || stats.area > 4200 || stats.distance > 125) continue;
 
-      map.setFilter(BUILDING_LAYER, [
-        "all",
-        baseFilter,
-        [
-          "!=",
-          [
-            "to-string",
-            ["coalesce", ["get", "id"], ["id"], ""]
-          ],
-          String(targetId)
-        ]
-      ]);
+        const sizePenalty = Math.abs(Math.log(stats.area / 1000)) * 18;
+        const shapePenalty =
+          Math.max(stats.width, stats.height) / Math.min(stats.width, stats.height) > 3.2
+            ? 28
+            : 0;
+
+        candidates.push({
+          id,
+          feature,
+          ...stats,
+          score: stats.distance + sizePenalty + shapePenalty
+        });
+      }
+
+      candidates.sort((a, b) => a.score - b.score);
+      const target = candidates[0];
+
+      if (!target) {
+        console.warn("Footprint correto da Prefeitura não foi localizado.");
+        return;
+      }
+
+      prefeituraTargetId = target.id;
+      prefeituraOrigin = target.center;
+
+      const mercator = maplibreglRuntime.MercatorCoordinate.fromLngLat(
+        prefeituraOrigin,
+        PREFEITURA_ALTITUDE
+      );
+
+      prefeituraTransform.translateX = mercator.x;
+      prefeituraTransform.translateY = mercator.y;
+      prefeituraTransform.translateZ = mercator.z;
+      prefeituraTransform.scale = mercator.meterInMercatorCoordinateUnits();
+
+      updatePrefeituraLabelPosition();
+      applyPrefeituraBuildingFilter();
+      map.triggerRepaint();
+
+      console.info("Prefeitura encaixada no footprint:", {
+        id: prefeituraTargetId,
+        center: prefeituraOrigin,
+        width: target.width,
+        height: target.height
+      });
     } catch (error) {
-      console.debug("Não foi possível ocultar apenas o footprint da Prefeitura.", error);
+      console.warn("Não foi possível encaixar a Prefeitura no footprint.", error);
     }
   }
 
@@ -626,11 +770,7 @@
           source: BUILDING_SOURCE,
           "source-layer": "building",
           minzoom: 11.5,
-          filter: [
-            "any",
-            ["!", ["has", "is_underground"]],
-            ["!=", ["get", "is_underground"], true]
-          ],
+          filter: prefeituraBaseBuildingFilter(),
           layout: {
             visibility: "none"
           },
@@ -672,7 +812,7 @@
     );
 
     if (active) {
-      map.once("idle", excludeGenericPrefeituraBuilding);
+      map.once("idle", snapPrefeituraToFootprint);
     }
   }
 
@@ -718,6 +858,7 @@
       ]);
 
       maplibregl = modules[0];
+      maplibreglRuntime = maplibregl;
       Protocol = modules[1].Protocol;
       THREE = modules[2];
       GLTFLoader = modules[3].GLTFLoader;
@@ -870,11 +1011,11 @@
     };
 
     const prefeituraMercator = maplibregl.MercatorCoordinate.fromLngLat(
-      PREFEITURA_ORIGIN,
+      prefeituraOrigin,
       PREFEITURA_ALTITUDE
     );
 
-    const prefeituraTransform = {
+    prefeituraTransform = {
       translateX: prefeituraMercator.x,
       translateY: prefeituraMercator.y,
       translateZ: prefeituraMercator.z,
