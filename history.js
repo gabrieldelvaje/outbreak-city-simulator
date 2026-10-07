@@ -38,7 +38,7 @@
 
   const PREFEITURA_LAYER = "prefeitura-piracicaba-3d";
   const PREFEITURA_MODEL_URL = "./models/prefeitura-piracicaba.glb";
-  const PREFEITURA_SEARCH_ORIGIN = [-47.66478, -22.72886];
+  const PREFEITURA_SEARCH_ORIGIN = [-47.66434, -22.72866];
   const PREFEITURA_ALTITUDE = 0.8;
   const PREFEITURA_ROTATION_Y = 108 * Math.PI / 180;
   const PREFEITURA_LABEL_SOURCE = "prefeitura-label-source";
@@ -580,6 +580,7 @@
     let east = -Infinity;
     let south = Infinity;
     let north = -Infinity;
+    let vertexCount = 0;
 
     const walk = (value) => {
       if (!Array.isArray(value)) return;
@@ -593,6 +594,7 @@
         east = Math.max(east, value[0]);
         south = Math.min(south, value[1]);
         north = Math.max(north, value[1]);
+        vertexCount += 1;
         return;
       }
 
@@ -617,7 +619,8 @@
       width,
       height,
       area: width * height,
-      distance
+      distance,
+      vertexCount
     };
   }
 
@@ -659,7 +662,7 @@
       // Search around the marked civic-center block, then choose a substantial
       // footprint close to that anchor instead of guessing coordinates.
       const point = map.project(PREFEITURA_SEARCH_ORIGIN);
-      const radius = window.matchMedia("(max-width: 720px)").matches ? 42 : 34;
+      const radius = window.matchMedia("(max-width: 720px)").matches ? 74 : 58;
 
       const features = map.queryRenderedFeatures(
         [
@@ -680,21 +683,32 @@
         const stats = footprintStats(feature);
         if (!stats) continue;
 
-        // The city-hall block is much larger than the small service buildings
-        // around it. Keep only plausible tower footprints.
-        if (stats.area < 500 || stats.area > 2800 || stats.distance > 90) continue;
+        // O footprint correto é o bloco grande marcado pelo usuário:
+        // substancial e irregular, com um recorte visível. Isso o diferencia
+        // dos retângulos simples ao redor.
+        if (
+          stats.area < 650 ||
+          stats.area > 3600 ||
+          stats.distance > 125 ||
+          stats.vertexCount < 7
+        ) continue;
 
-        const sizePenalty = Math.abs(Math.log(stats.area / 1000)) * 18;
-        const shapePenalty =
-          Math.max(stats.width, stats.height) / Math.min(stats.width, stats.height) > 3.2
-            ? 28
-            : 0;
+        const aspect =
+          Math.max(stats.width, stats.height) / Math.min(stats.width, stats.height);
+
+        const sizePenalty = Math.abs(Math.log(stats.area / 1250)) * 12;
+        const aspectPenalty = aspect > 2.7 ? 32 : 0;
+        const irregularBonus = Math.min(stats.vertexCount, 18) * 3.2;
 
         candidates.push({
           id,
           feature,
           ...stats,
-          score: stats.distance + sizePenalty + shapePenalty
+          score:
+            stats.distance +
+            sizePenalty +
+            aspectPenalty -
+            irregularBonus
         });
       }
 
@@ -727,7 +741,9 @@
         id: prefeituraTargetId,
         center: prefeituraOrigin,
         width: target.width,
-        height: target.height
+        height: target.height,
+        area: target.area,
+        vertexCount: target.vertexCount
       });
     } catch (error) {
       console.warn("Não foi possível encaixar a Prefeitura no footprint.", error);
