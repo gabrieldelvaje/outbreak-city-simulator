@@ -38,7 +38,7 @@
 
   const PREFEITURA_LAYER = "prefeitura-piracicaba-3d";
   const PREFEITURA_MODEL_URL = "./models/prefeitura-piracicaba.glb";
-  const PREFEITURA_ORIGIN = [-47.66450, -22.72870];
+  const PREFEITURA_ORIGIN = [-47.66518, -22.72847];
   const PREFEITURA_ALTITUDE = 0.8;
   const PREFEITURA_ROTATION_Y = 10 * Math.PI / 180;
   const PREFEITURA_LABEL_SOURCE = "prefeitura-label-source";
