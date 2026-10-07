@@ -38,9 +38,9 @@
 
   const PREFEITURA_LAYER = "prefeitura-piracicaba-3d";
   const PREFEITURA_MODEL_URL = "./models/prefeitura-piracicaba.glb";
-  const PREFEITURA_SEARCH_ORIGIN = [-47.66478, -22.72890];
+  const PREFEITURA_SEARCH_ORIGIN = [-47.66434, -22.72866];
   const PREFEITURA_ALTITUDE = 0.8;
-  const PREFEITURA_ROTATION_Y = 10 * Math.PI / 180;
+  const PREFEITURA_ROTATION_Y = 18 * Math.PI / 180;
   const PREFEITURA_LABEL_SOURCE = "prefeitura-label-source";
   const PREFEITURA_LABEL_LAYER = "prefeitura-label-3d";
 
@@ -659,7 +659,7 @@
       // Search around the marked civic-center block, then choose a substantial
       // footprint close to that anchor instead of guessing coordinates.
       const point = map.project(PREFEITURA_SEARCH_ORIGIN);
-      const radius = window.matchMedia("(max-width: 720px)").matches ? 72 : 58;
+      const radius = window.matchMedia("(max-width: 720px)").matches ? 58 : 44;
 
       const features = map.queryRenderedFeatures(
         [
@@ -682,7 +682,7 @@
 
         // The city-hall block is much larger than the small service buildings
         // around it. Keep only plausible tower footprints.
-        if (stats.area < 350 || stats.area > 4200 || stats.distance > 125) continue;
+        if (stats.area < 500 || stats.area > 2800 || stats.distance > 90) continue;
 
         const sizePenalty = Math.abs(Math.log(stats.area / 1000)) * 18;
         const shapePenalty =
