@@ -1,24 +1,29 @@
-# Piracicaba — Transporte Público
+# Piracicaba — mapa urbano interativo
 
-Mapa interativo das linhas de ônibus de Piracicaba.
+Um mesmo mapa com duas leituras da cidade.
 
-## V1
+## História
 
-- mapa 100% 2D em MapLibre GL JS;
-- catálogo atual de linhas baseado na página **Linhas e Horários** da Pira Mobilidade;
-- traçados carregados como dados abertos de relações `route=bus` do OpenStreetMap via Overpass;
-- busca por número ou destino;
-- clique em uma linha para isolá-la e enquadrar seu percurso;
-- visualização da rede inteira;
-- interface responsiva para desktop e mobile.
+Camada 3D experimental com edifícios extrudados e landmarks modelados individualmente. A versão atual preserva a Ponte Pênsil e a Prefeitura de Piracicaba como objetos 3D customizados.
+
+Acesse em `historia.html`.
+
+## Transporte
+
+Camada 2D com catálogo atual de linhas de ônibus e traçados abertos de relações `route=bus` do OpenStreetMap via Overpass.
+
+A página inicial (`index.html`) abre em Transporte.
 
 ## Fontes
 
-- Pira Mobilidade — catálogo de linhas e horários: https://piramobilidade.com.br/linhas-e-horarios/
-- Prefeitura de Piracicaba — transporte urbano: https://piracicaba.sp.gov.br/servicos/linhas-de-onibus-horarios-e-itinerarios/
-- OpenStreetMap / Overpass — geometria aberta dos traçados.
-- OpenFreeMap — mapa-base.
+- Pira Mobilidade — catálogo de linhas e horários
+- Prefeitura de Piracicaba
+- OpenStreetMap / Overpass
+- OpenFreeMap
+- Overture Maps Buildings na camada História
 
-### Observação sobre cobertura
+## Estrutura
 
-O catálogo de linhas e o traçado têm fontes diferentes. Uma linha oficial pode aparecer na lista sem geometria caso sua relação ainda não esteja mapeada ou atualizada no OpenStreetMap. A interface deixa essas linhas visualmente desativadas em vez de inventar um percurso.
+- `index.html` + `app.js` + `styles.css`: Transporte
+- `historia.html` + `history.js` + `history.css`: História
+- `models/`: landmarks GLB usados na camada História
