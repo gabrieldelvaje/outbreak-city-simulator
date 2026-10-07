@@ -4,29 +4,21 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#f3f3f1" />
-  <meta name="description" content="Mapa-base interativo do centro de Piracicaba, preparado para receber patrimônio, fotografias históricas e landmarks 3D personalizados." />
-  <title>Piracicaba 3D</title>
+  <meta name="description" content="Mapa interativo das linhas de ônibus de Piracicaba, com catálogo oficial e traçados abertos." />
+  <title>Piracicaba — Transporte Público</title>
   <link rel="preconnect" href="https://tiles.openfreemap.org" />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.12.0/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="./styles.css" />
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
-      }
-    }
-  </script>
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
-      <a class="brand" href="./" aria-label="Piracicaba 3D — início">
+      <a class="brand" href="./" aria-label="Piracicaba Transporte Público — início">
         <span class="brand-mark" aria-hidden="true"></span>
         <span>PIRACICABA</span>
         <span class="brand-slash">/</span>
-        <strong>MAPA</strong>
+        <strong>ÔNIBUS</strong>
       </a>
 
       <div class="topbar-right">
@@ -36,24 +28,52 @@
     </header>
 
     <main class="map-stage">
-      <div id="map" aria-label="Mapa interativo do centro de Piracicaba"></div>
+      <div id="map" aria-label="Mapa das linhas de ônibus de Piracicaba"></div>
 
-      <div class="map-actions" aria-label="Controles de visualização">
-        <button id="view-toggle" class="action-button" type="button" aria-pressed="false" title="Alternar perspectiva 3D">
-          <span class="action-icon" aria-hidden="true">◇</span>
-          <span>3D</span>
+      <section id="route-panel" class="route-panel" aria-label="Linhas de ônibus">
+        <button id="panel-toggle" class="panel-handle" type="button" aria-expanded="true" aria-label="Abrir ou fechar lista de linhas">
+          <span></span>
         </button>
 
-        <button id="reset-view" class="action-button" type="button" title="Voltar ao enquadramento central">
-          <span class="action-icon" aria-hidden="true">↗</span>
-          <span>Centro</span>
-        </button>
-      </div>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">TRANSPORTE PÚBLICO · V1</p>
+            <h1>Linhas de ônibus</h1>
+          </div>
+          <button id="show-network" class="network-button" type="button">Rede inteira</button>
+        </div>
 
-      <div class="map-key">
-        <span>Centro histórico · Piracicaba</span>
-        <span>MapLibre · OpenFreeMap · OpenStreetMap</span>
-      </div>
+        <label class="search-box">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input id="route-search" type="search" placeholder="Buscar linha ou destino" autocomplete="off" />
+        </label>
+
+        <div class="route-summary">
+          <span id="route-count">Carregando traçados…</span>
+          <span>catálogo atual</span>
+        </div>
+
+        <div id="route-list" class="route-list" aria-live="polite"></div>
+
+        <div class="panel-source">
+          <span>Linhas: Pira Mobilidade</span>
+          <span>Traçados: OpenStreetMap</span>
+        </div>
+      </section>
+
+      <aside id="selected-route" class="selected-route" hidden>
+        <span class="selected-swatch" aria-hidden="true"></span>
+        <div class="selected-copy">
+          <strong id="selected-ref"></strong>
+          <span id="selected-name"></span>
+        </div>
+        <button id="close-selected" type="button" aria-label="Voltar para a rede inteira">×</button>
+      </aside>
+
+      <button id="reset-view" class="reset-button" type="button" title="Mostrar a rede inteira">
+        <span aria-hidden="true">↗</span>
+        <span>Rede inteira</span>
+      </button>
     </main>
 
     <noscript>Este mapa precisa de JavaScript para funcionar.</noscript>

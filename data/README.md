@@ -1,12 +1,9 @@
-# data
+# Dados
 
-Pasta reservada para os dados próprios do projeto.
+A V1 não armazena geometrias proprietárias de transporte.
 
-Planejado:
-- limite municipal;
-- base de patrimônio do CODEPAC;
-- pontos de interesse;
-- fotografias e metadados históricos;
-- GeoJSONs derivados e validados.
+- O catálogo de linhas atuais está embutido em `app.js` a partir da página pública da Pira Mobilidade.
+- Os traçados são consultados em tempo de execução no OpenStreetMap por meio da API Overpass, usando relações `type=route` + `route=bus`.
+- Apenas códigos que também existem no catálogo oficial são renderizados.
 
-A V1 ainda não adiciona camadas históricas próprias.
+Isso mantém separado o que é **cadastro oficial da linha** do que é **geometria aberta colaborativa**.
