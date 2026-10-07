@@ -38,7 +38,7 @@
 
   const PREFEITURA_LAYER = "prefeitura-piracicaba-3d";
   const PREFEITURA_MODEL_URL = "./models/prefeitura-piracicaba.glb";
-  const PREFEITURA_SEARCH_ORIGIN = [-47.66434, -22.72866];
+  const PREFEITURA_SEARCH_ORIGIN = [-47.66478, -22.72886];
   const PREFEITURA_ALTITUDE = 0.8;
   const PREFEITURA_ROTATION_Y = 108 * Math.PI / 180;
   const PREFEITURA_LABEL_SOURCE = "prefeitura-label-source";
@@ -659,7 +659,7 @@
       // Search around the marked civic-center block, then choose a substantial
       // footprint close to that anchor instead of guessing coordinates.
       const point = map.project(PREFEITURA_SEARCH_ORIGIN);
-      const radius = window.matchMedia("(max-width: 720px)").matches ? 58 : 44;
+      const radius = window.matchMedia("(max-width: 720px)").matches ? 42 : 34;
 
       const features = map.queryRenderedFeatures(
         [
